@@ -706,12 +706,11 @@ jobs:
             --config-file build/jreleaser-upload.yml
             --yolo
         env:
-          JRELEASER_MAVENCENTRAL_USERNAME: ${{ secrets.JRELEASER_MAVENCENTRAL_USERNAME }}
-          JRELEASER_MAVENCENTRAL_PASSWORD: ${{ secrets.JRELEASER_MAVENCENTRAL_PASSWORD }}
+          JRELEASER_DEPLOY_MAVEN_MAVENCENTRAL_CENTRAL_TOKEN: ${{ secrets.JRELEASER_MAVENCENTRAL_TOKEN }}
           JRELEASER_GPG_PUBLIC_KEY: ${{ secrets.JRELEASER_GPG_PUBLIC_KEY }}
           JRELEASER_GPG_SECRET_KEY: ${{ secrets.JRELEASER_GPG_SECRET_KEY }}
           JRELEASER_GPG_PASSPHRASE: ${{ secrets.JRELEASER_GPG_PASSPHRASE }}
-          JRELEASER_MAVENCENTRAL_STAGE: UPLOAD
+          JRELEASER_DEPLOY_MAVEN_MAVENCENTRAL_CENTRAL_STAGE: UPLOAD
 
       - name: Record Central deployment
         if: ${{ always() }}
