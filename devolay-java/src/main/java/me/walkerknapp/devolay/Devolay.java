@@ -20,7 +20,7 @@ public class Devolay {
         String libraryExtension = devolayLibraryName.substring(devolayLibraryName.indexOf('.'));
 
         String osDirectory = getOsDirectory();
-        String archDirectory = getArchDirectory();
+        String archDirectory = getArchDirectory(osDirectory);
 
         if (!osDirectory.equals("android")) {
             Path devolayNativesPath = extractNative("devolay-natives", libraryExtension,
@@ -81,11 +81,13 @@ public class Devolay {
         }
     }
 
-    private static String getArchDirectory() {
+    private static String getArchDirectory(String osDirectory) {
         final String osArchProperty = System.getProperty("os.arch").toLowerCase();
-        if (osArchProperty.contains("aarch64") || (osArchProperty.contains("arm") && (osArchProperty.contains("64") || osArchProperty.contains("v8")))) {
-            return "arm64-v8a";
-        } else if (osArchProperty.contains("aarch32") || (osArchProperty.contains("arm") && (osArchProperty.contains("32") || osArchProperty.contains("v7")))) {
+        if (osArchProperty.contains("aarch64") || osArchProperty.contains("arm64")
+                || (osArchProperty.contains("arm") && (osArchProperty.contains("64") || osArchProperty.contains("v8")))) {
+            return osDirectory.equals("android") ? "arm64-v8a" : "aarch64";
+        } else if (osArchProperty.contains("aarch32")
+                || (osArchProperty.contains("arm") && (osArchProperty.contains("32") || osArchProperty.contains("v7")))) {
             return "armv7a";
         } else if (osArchProperty.contains("64")) {
             return "x86-64";
