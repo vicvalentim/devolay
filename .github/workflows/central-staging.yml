@@ -643,6 +643,34 @@ jobs:
           echo "PomChecker version:"
           "$pomchecker_bin" --version
 
+      - name: Validate generated POM directly
+        run: |
+          set -euo pipefail
+
+          pom_file="$(find devolay-java/build/staging-deploy \
+            -type f \
+            -name 'devolay-*.pom' \
+            -print \
+            -quit)"
+
+          if [ -z "$pom_file" ]; then
+            echo "Generated POM was not found." >&2
+            exit 1
+          fi
+
+          echo "Validating generated POM: $pom_file"
+          sed -n '1,260p' "$pom_file"
+
+          mvn \
+            --batch-mode \
+            --no-transfer-progress \
+            --file "$pom_file" \
+            org.kordamp.maven:pomchecker-maven-plugin:1.15.0:check-maven-central \
+            -Dchecker.release=true \
+            -Dchecker.strict=true \
+            -Dchecker.fail.on.error=true \
+            -Dchecker.fail.on.warning=true
+
       - name: Validate Central bundle with JReleaser
         uses: jreleaser/release-action@v2
         with:
