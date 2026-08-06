@@ -1,10 +1,10 @@
+import org.gradle.api.component.AdhocComponentWithVariants
 import org.gradle.internal.jvm.Jvm
 
 plugins {
     base
     `java-library`
     `maven-publish`
-    signing
 }
 
 base.archivesBaseName = "devolay"
@@ -23,6 +23,20 @@ java {
         usingSourceSet(sourceSets["main"])
         usingSourceSet(sourceSets["integrated"])
     }
+}
+
+// The Central publication contains only the non-integrated desktop artifact.
+// Integrated NDI variants remain available to local builds but are not published.
+val javaComponent = components["java"] as AdhocComponentWithVariants
+
+javaComponent.withVariantsFromConfiguration(
+        configurations["integratedApiElements"]) {
+    skip()
+}
+
+javaComponent.withVariantsFromConfiguration(
+        configurations["integratedRuntimeElements"]) {
+    skip()
 }
 
 val sourceJar by tasks.creating(Jar::class) {
@@ -98,12 +112,12 @@ val androidAar by tasks.registering(Zip::class) {
 publishing {
     repositories {
         maven {
-            name = "OSSRH"
-            url = uri("https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/")
-            credentials {
-                username = System.getenv("OSSRH_USERNAME")
-                password = System.getenv("OSSRH_PASSWORD")
-            }
+            name = "Staging"
+            url = layout.buildDirectory
+                    .dir("staging-deploy")
+                    .get()
+                    .asFile
+                    .toURI()
         }
     }
     publications {
@@ -111,23 +125,19 @@ publishing {
             from(components["java"])
             artifact(sourceJar)
             artifact(javadocJar)
-            artifact(androidAar) {
-                extension = "aar"
-            }
-
             groupId = project.group as String
             artifactId = "devolay"
             version = project.version as String?
 
             pom {
-                name.set("Devolay")
-                description.set("Devolay is a library for sending and receiving video over the network using the Newtek NDI(tm) SDK.")
-                url.set("https://github.com/WalkerKnapp/devolay")
+                name.set("Devolay Community Fork")
+                description.set("Community-maintained fork of Devolay, a Java library for sending and receiving video over networks using the NDI(tm) SDK.")
+                url.set("https://github.com/vicvalentim/devolay")
 
                 licenses {
                     license {
                         name.set("The Apache License, Version 2.0")
-                        url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                        url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
                     }
                 }
 
@@ -136,22 +146,28 @@ publishing {
                         id.set("WalkerKnapp")
                         name.set("Walker Knapp")
                         email.set("walker@walkerknapp.me")
+                        url.set("https://github.com/WalkerKnapp")
+                        roles.set(listOf("original author"))
+                    }
+
+                    developer {
+                        id.set("vicvalentim")
+                        name.set("Victor Valentim")
+                        url.set("https://github.com/vicvalentim")
+                        roles.set(listOf("maintainer"))
                     }
                 }
 
                 scm {
-                    connection.set("scm:git:git://github.com/WalkerKnapp/devolay.git")
-                    developerConnection.set("scm:git:git@github.com:WalkerKnapp/devolay.git")
-                    url.set("https://github.com/WalkerKnapp/devolay")
+                    connection.set(
+                            "scm:git:https://github.com/vicvalentim/devolay.git")
+                    developerConnection.set(
+                            "scm:git:ssh://git@github.com/vicvalentim/devolay.git")
+                    url.set("https://github.com/vicvalentim/devolay")
                 }
             }
         }
     }
-}
-
-signing {
-    useInMemoryPgpKeys(System.getenv("PGP_KEY_ID"), System.getenv("PGP_KEY"), System.getenv("PGP_PASSWORD"))
-    sign(publishing.publications["devolay"])
 }
 
 // Generate an artifact of the JNI headers created by this project, for devolay-natives to consume.

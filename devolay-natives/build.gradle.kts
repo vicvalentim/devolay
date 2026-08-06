@@ -250,6 +250,7 @@ val assembleNativeArtifacts by tasks.registering(Jar::class) {
                         into("natives/" + machine.operatingSystemFamily.name + "/" + machine.architecture.name)
                         exclude("*.lib")
                         exclude("*.debug")
+                        exclude("*.dwarf")
                     }
                 }
             }
