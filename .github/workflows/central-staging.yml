@@ -1,0 +1,701 @@
+name: Maven Central staging
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - feature/central-publishing
+    paths:
+      - ".github/workflows/central-staging.yml"
+      - '.github/workflows/g\+\+-faker.py'
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle/**"
+      - "gradlew"
+      - "gradlew.bat"
+      - "devolay-java/**"
+      - "devolay-natives/**"
+      - "jreleaser.yml"
+
+  pull_request:
+    paths:
+      - ".github/workflows/central-staging.yml"
+      - '.github/workflows/g\+\+-faker.py'
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle/**"
+      - "gradlew"
+      - "gradlew.bat"
+      - "devolay-java/**"
+      - "devolay-natives/**"
+      - "jreleaser.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: central-staging-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  JAVA_VERSION: "11"
+  NDI_SDK_LINUX_URL: >-
+    https://downloads.ndi.tv/SDK/NDI_SDK_Linux/Install_NDI_SDK_v5_Linux.tar.gz
+  NATIVE_JAR: >-
+    devolay-natives/build/tmp/assembleNativeArtifacts/devolay-native-artifacts.jar
+
+jobs:
+  ndi-headers:
+    name: Prepare NDI headers
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Download NDI SDK headers
+        run: |
+          set -euo pipefail
+
+          curl \
+            --fail \
+            --location \
+            --retry 5 \
+            --output ndi-sdk-linux.tar.gz \
+            "$NDI_SDK_LINUX_URL"
+
+          tar -xf ndi-sdk-linux.tar.gz
+
+          installer="$(
+            find . \
+              -maxdepth 1 \
+              -type f \
+              -name 'Install_NDI_SDK*_Linux.sh' \
+              -print \
+              -quit
+          )"
+
+          if [ -z "$installer" ]; then
+            echo "NDI Linux SDK installer was not found." >&2
+            exit 1
+          fi
+
+          sed -i 's/read -p/cat/g' "$installer"
+          PAGER=cat REPLY=y bash "$installer"
+
+          include_dir="$(
+            find . \
+              -maxdepth 4 \
+              -type d \
+              \( -name include -o -name Include \) \
+              -path '*NDI*' \
+              -print \
+              -quit
+          )"
+
+          if [ -z "$include_dir" ]; then
+            echo "NDI SDK include directory was not found." >&2
+            exit 1
+          fi
+
+          mkdir -p ndi-sdk/include
+          cp -R "$include_dir"/. ndi-sdk/include/
+
+          test -f ndi-sdk/include/Processing.NDI.Lib.h
+
+          echo "NDI headers prepared:"
+          find ndi-sdk/include \
+            -maxdepth 1 \
+            -type f \
+            -print \
+            | sort
+
+      - name: Upload NDI headers
+        uses: actions/upload-artifact@v7
+        with:
+          name: ndi-headers
+          path: ndi-sdk
+          if-no-files-found: error
+          retention-days: 1
+
+  native-linux-windows:
+    name: Linux and Windows natives
+    needs: ndi-headers
+    runs-on: ubuntu-22.04
+
+    env:
+      NDI_SDK_DIR: ${{ github.workspace }}/build/ndi-sdk
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Download NDI headers
+        uses: actions/download-artifact@v8
+        with:
+          name: ndi-headers
+          path: build/ndi-sdk
+
+      - name: Install native toolchains
+        run: |
+          set -euo pipefail
+
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-multilib \
+            g++-multilib \
+            mingw-w64 \
+            unzip
+
+          chmod +x gradlew
+          chmod +x .github/workflows/g++-faker.py
+
+          sudo ln -sf \
+            "$GITHUB_WORKSPACE/.github/workflows/g++-faker.py" \
+            /usr/bin/i686-w64-mingw32-g++-faker
+
+          sudo ln -sf \
+            "$GITHUB_WORKSPACE/.github/workflows/g++-faker.py" \
+            /usr/bin/x86_64-w64-mingw32-g++-faker
+
+          test -f \
+            "$NDI_SDK_DIR/include/Processing.NDI.Lib.h"
+
+      - name: Build Linux and Windows natives
+        run: |
+          set -euo pipefail
+
+          ./gradlew \
+            --no-daemon \
+            :devolay-natives:assembleNativeArtifacts \
+            --rerun-tasks
+
+      - name: Validate Linux and Windows natives
+        run: |
+          set -euo pipefail
+
+          test -f "$NATIVE_JAR"
+
+          entries="$(jar tf "$NATIVE_JAR")"
+          printf '%s\n' "$entries"
+
+          expected_directories=(
+            "natives/linux/x86"
+            "natives/linux/x86-64"
+            "natives/windows/x86"
+            "natives/windows/x86-64"
+          )
+
+          for directory in "${expected_directories[@]}"; do
+            if ! grep -Eq \
+              "^${directory}/[^/]+\.(so|dll)$" \
+              <<<"$entries"; then
+              echo "Missing native binary in ${directory}" >&2
+              exit 1
+            fi
+          done
+
+          if grep -Eiq \
+            'libndi|integrated|\.dwarf$|\.debug$' \
+            <<<"$entries"; then
+            echo "Forbidden file found in native artifact." >&2
+            exit 1
+          fi
+
+      - name: Prepare Linux and Windows artifact
+        run: |
+          set -euo pipefail
+
+          mkdir -p build/ci-artifacts
+
+          cp \
+            "$NATIVE_JAR" \
+            build/ci-artifacts/devolay-native-linux-windows.jar
+
+      - name: Upload Linux and Windows natives
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-linux-windows
+          path: >-
+            build/ci-artifacts/devolay-native-linux-windows.jar
+          if-no-files-found: error
+          retention-days: 1
+
+  native-macos:
+    name: macOS Intel and Apple Silicon natives
+    needs: ndi-headers
+    runs-on: macos-15
+
+    env:
+      NDI_SDK_DIR: ${{ github.workspace }}/build/ndi-sdk
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Download NDI headers
+        uses: actions/download-artifact@v8
+        with:
+          name: ndi-headers
+          path: build/ndi-sdk
+
+      - name: Build macOS natives
+        run: |
+          set -euo pipefail
+
+          chmod +x gradlew
+
+          test -f \
+            "$NDI_SDK_DIR/include/Processing.NDI.Lib.h"
+
+          ./gradlew \
+            --no-daemon \
+            :devolay-natives:assembleNativeArtifacts \
+            --rerun-tasks
+
+      - name: Validate macOS natives
+        run: |
+          set -euo pipefail
+
+          test -f "$NATIVE_JAR"
+
+          entries="$(jar tf "$NATIVE_JAR")"
+          printf '%s\n' "$entries"
+
+          expected_directories=(
+            "natives/macos/x86-64"
+            "natives/macos/aarch64"
+          )
+
+          for directory in "${expected_directories[@]}"; do
+            if ! grep -Eq \
+              "^${directory}/[^/]+\.dylib$" \
+              <<<"$entries"; then
+              echo "Missing native binary in ${directory}" >&2
+              exit 1
+            fi
+          done
+
+          if grep -Eiq \
+            'libndi|integrated|\.dwarf$|\.debug$' \
+            <<<"$entries"; then
+            echo "Forbidden file found in native artifact." >&2
+            exit 1
+          fi
+
+      - name: Prepare macOS artifact
+        run: |
+          set -euo pipefail
+
+          mkdir -p build/ci-artifacts
+
+          cp \
+            "$NATIVE_JAR" \
+            build/ci-artifacts/devolay-native-macos.jar
+
+      - name: Upload macOS natives
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-macos
+          path: build/ci-artifacts/devolay-native-macos.jar
+          if-no-files-found: error
+          retention-days: 1
+
+  central-staging:
+    name: Assemble and validate Central staging
+    needs:
+      - ndi-headers
+      - native-linux-windows
+      - native-macos
+    runs-on: ubuntu-22.04
+
+    env:
+      NDI_SDK_DIR: ${{ github.workspace }}/build/ndi-sdk
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Download NDI headers
+        uses: actions/download-artifact@v8
+        with:
+          name: ndi-headers
+          path: build/ndi-sdk
+
+      - name: Download Linux and Windows natives
+        uses: actions/download-artifact@v8
+        with:
+          name: native-linux-windows
+          path: build/native-input/linux-windows
+
+      - name: Download macOS natives
+        uses: actions/download-artifact@v8
+        with:
+          name: native-macos
+          path: build/native-input/macos
+
+      - name: Assemble universal native JAR
+        run: |
+          set -euo pipefail
+
+          linux_windows_jar="build/native-input/linux-windows/devolay-native-linux-windows.jar"
+          macos_jar="build/native-input/macos/devolay-native-macos.jar"
+          native_tree="build/universal-native-tree"
+          universal_jar="build/universal-native-artifacts.jar"
+
+          test -f "$linux_windows_jar"
+          test -f "$macos_jar"
+
+          rm -rf "$native_tree"
+          mkdir -p "$native_tree"
+
+          unzip -q -o "$linux_windows_jar" -d "$native_tree"
+          unzip -q -o "$macos_jar" -d "$native_tree"
+
+          rm -rf "$native_tree/META-INF"
+
+          jar \
+            --create \
+            --file "$universal_jar" \
+            -C "$native_tree" .
+
+          entries="$(jar tf "$universal_jar")"
+          printf '%s\n' "$entries"
+
+          expected_directories=(
+            "natives/linux/x86"
+            "natives/linux/x86-64"
+            "natives/windows/x86"
+            "natives/windows/x86-64"
+            "natives/macos/x86-64"
+            "natives/macos/aarch64"
+          )
+
+          for directory in "${expected_directories[@]}"; do
+            if ! grep -Eq \
+              "^${directory}/[^/]+\.(so|dll|dylib)$" \
+              <<<"$entries"; then
+              echo "Missing native binary in ${directory}" >&2
+              exit 1
+            fi
+          done
+
+          if grep -Eiq \
+            'libndi|integrated|\.dwarf$|\.debug$|natives/android/' \
+            <<<"$entries"; then
+            echo "Forbidden file found in universal artifact." >&2
+            exit 1
+          fi
+
+      - name: Generate Maven staging repository
+        run: |
+          set -euo pipefail
+
+          test -f \
+            "$NDI_SDK_DIR/include/Processing.NDI.Lib.h"
+
+          rm -rf devolay-java/build/staging-deploy
+
+          ./gradlew \
+            --no-daemon \
+            -PprebuiltNativeArtifacts="$GITHUB_WORKSPACE/build/universal-native-artifacts.jar" \
+            :devolay-java:publishDevolayPublicationToStagingRepository \
+            --rerun-tasks
+
+      - name: Validate Maven staging repository
+        run: |
+          set -euo pipefail
+
+          version="$(
+            python3 - <<'PY_VERSION'
+          import re
+          from pathlib import Path
+
+          text = Path("build.gradle.kts").read_text(
+              encoding="utf-8"
+          )
+
+          match = re.search(
+              r'^\s*version\s*=\s*"([^"]+)"',
+              text,
+              re.MULTILINE,
+          )
+
+          if not match:
+              raise SystemExit(
+                  "Project version was not found."
+              )
+
+          print(match.group(1))
+          PY_VERSION
+          )"
+
+          stage="devolay-java/build/staging-deploy/io/github/vicvalentim/devolay/${version}"
+          main_jar="${stage}/devolay-${version}.jar"
+          module_file="${stage}/devolay-${version}.module"
+          pom_file="${stage}/devolay-${version}.pom"
+
+          expected_files=(
+            "$main_jar"
+            "${stage}/devolay-${version}-sources.jar"
+            "${stage}/devolay-${version}-javadoc.jar"
+            "$pom_file"
+            "$module_file"
+          )
+
+          for file in "${expected_files[@]}"; do
+            test -f "$file"
+          done
+
+          if find "$stage" \
+            -maxdepth 1 \
+            -type f \
+            | grep -Eiq '\.aar$|integrated'; then
+            echo "AAR or integrated artifact found." >&2
+            exit 1
+          fi
+
+          entries="$(jar tf "$main_jar")"
+          printf '%s\n' "$entries"
+
+          expected_directories=(
+            "natives/linux/x86"
+            "natives/linux/x86-64"
+            "natives/windows/x86"
+            "natives/windows/x86-64"
+            "natives/macos/x86-64"
+            "natives/macos/aarch64"
+          )
+
+          for directory in "${expected_directories[@]}"; do
+            if ! grep -Eq \
+              "^${directory}/[^/]+\.(so|dll|dylib)$" \
+              <<<"$entries"; then
+              echo "Missing native binary in ${directory}" >&2
+              exit 1
+            fi
+          done
+
+          if grep -Eiq \
+            'libndi|integrated|\.dwarf$|\.debug$|natives/android/' \
+            <<<"$entries"; then
+            echo "Forbidden file found in Maven JAR." >&2
+            exit 1
+          fi
+
+          if grep -Eiq \
+            'integrated|ndi-lib|integratedApiElements|integratedRuntimeElements' \
+            "$module_file"; then
+            echo "Integrated variant found in Gradle metadata." >&2
+            exit 1
+          fi
+
+          grep -q \
+            '<groupId>io.github.vicvalentim</groupId>' \
+            "$pom_file"
+
+          grep -q \
+            '<artifactId>devolay</artifactId>' \
+            "$pom_file"
+
+      - name: Create temporary JReleaser validation configuration
+        run: |
+          set -euo pipefail
+
+          python3 - <<'PY_JRELEASER'
+          from pathlib import Path
+
+          source = Path("jreleaser.yml")
+          target = Path("build/jreleaser-validation.yml")
+
+          text = source.read_text(encoding="utf-8")
+
+          old_signing = "\n".join([
+              "signing:",
+              "  active: ALWAYS",
+              "  pgp:",
+              "    active: ALWAYS",
+              "    armored: true",
+              "",
+          ])
+
+          new_signing = "\n".join([
+              "signing:",
+              "  active: NEVER",
+              "  pgp:",
+              "    active: NEVER",
+              "    armored: true",
+              "",
+          ])
+
+          if old_signing not in text:
+              raise SystemExit(
+                  "Expected signing block was not found."
+              )
+
+          text = text.replace(
+              old_signing,
+              new_signing,
+              1,
+          )
+
+          old_rules = "\n".join([
+              "        applyMavenCentralRules: true",
+              "        stage: UPLOAD",
+          ])
+
+          new_rules = "\n".join([
+              "        applyMavenCentralRules: false",
+              "        verifyPom: false",
+              "        sign: false",
+              "        stage: UPLOAD",
+          ])
+
+          if old_rules not in text:
+              raise SystemExit(
+                  "Expected Maven Central block was not found."
+              )
+
+          text = text.replace(
+              old_rules,
+              new_rules,
+              1,
+          )
+
+          target.parent.mkdir(
+              parents=True,
+              exist_ok=True,
+          )
+
+          target.write_text(
+              text,
+              encoding="utf-8",
+          )
+
+          print(f"Created {target}")
+          PY_JRELEASER
+
+      - name: Install PomChecker
+        run: |
+          set -euo pipefail
+
+          pomchecker_version="1.15.0"
+          pomchecker_root="$RUNNER_TEMP/pomchecker-${pomchecker_version}"
+
+          curl \
+            --fail \
+            --location \
+            --retry 5 \
+            --output "$RUNNER_TEMP/pomchecker.zip" \
+            "https://github.com/kordamp/pomchecker/releases/download/v${pomchecker_version}/pomchecker-${pomchecker_version}.zip"
+
+          rm -rf "$pomchecker_root"
+          unzip -q "$RUNNER_TEMP/pomchecker.zip" -d "$RUNNER_TEMP"
+
+          pomchecker_bin="$pomchecker_root/bin/pomchecker"
+
+          if [ ! -f "$pomchecker_bin" ]; then
+            echo "PomChecker executable was not found:" >&2
+            find "$RUNNER_TEMP" \
+              -maxdepth 4 \
+              -type f \
+              -name 'pomchecker*' \
+              -print >&2
+            exit 1
+          fi
+
+          chmod +x "$pomchecker_bin"
+          echo "$pomchecker_root/bin" >> "$GITHUB_PATH"
+
+          test -x "$pomchecker_bin"
+
+          echo "PomChecker executable:"
+          ls -l "$pomchecker_bin"
+
+          echo "PomChecker version:"
+          "$pomchecker_bin" --version
+
+      - name: Validate generated POM directly
+        run: |
+          set -euo pipefail
+
+          pom_file="$(find devolay-java/build/staging-deploy \
+            -type f \
+            -name 'devolay-*.pom' \
+            -print \
+            -quit)"
+
+          if [ -z "$pom_file" ]; then
+            echo "Generated POM was not found." >&2
+            exit 1
+          fi
+
+          echo "Validating generated POM: $pom_file"
+          sed -n '1,260p' "$pom_file"
+
+          mvn \
+            --batch-mode \
+            --no-transfer-progress \
+            --file "$pom_file" \
+            org.kordamp.maven:pomchecker-maven-plugin:1.15.0:check-maven-central \
+            -Dchecker.release=true \
+            -Dchecker.strict=true \
+            -Dchecker.fail.on.error=true \
+            -Dchecker.fail.on.warning=true
+
+      - name: Validate Central bundle with JReleaser
+        uses: jreleaser/release-action@v2
+        with:
+          version: "1.25.0"
+          setup-java: false
+          arguments: >-
+            deploy
+            --basedir .
+            --config-file build/jreleaser-validation.yml
+            --dry-run
+            --yolo
+        env:
+          JRELEASER_MAVENCENTRAL_USERNAME: validation-only
+          JRELEASER_MAVENCENTRAL_PASSWORD: validation-only
+
+      - name: Upload complete staging result
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: central-staging
+          path: |
+            build/universal-native-artifacts.jar
+            devolay-java/build/staging-deploy
+            out/jreleaser/trace.log
+            out/jreleaser/output.properties
+          if-no-files-found: warn
+          retention-days: 7
