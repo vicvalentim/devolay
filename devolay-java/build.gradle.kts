@@ -150,8 +150,14 @@ publishing {
 }
 
 signing {
-    useInMemoryPgpKeys(System.getenv("PGP_KEY_ID"), System.getenv("PGP_KEY"), System.getenv("PGP_PASSWORD"))
-    sign(publishing.publications["devolay"])
+    val pgpKeyId = System.getenv("PGP_KEY_ID")
+    val pgpKey = System.getenv("PGP_KEY")
+    val pgpPassword = System.getenv("PGP_PASSWORD")
+
+    if (!pgpKey.isNullOrBlank() && !pgpPassword.isNullOrBlank()) {
+        useInMemoryPgpKeys(pgpKeyId, pgpKey, pgpPassword)
+        sign(publishing.publications["devolay"])
+    }
 }
 
 // Generate an artifact of the JNI headers created by this project, for devolay-natives to consume.
