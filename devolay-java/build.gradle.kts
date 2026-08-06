@@ -78,8 +78,25 @@ val nativeDesktopDependency: Configuration by configurations.creating
 val ndiDesktopDependency: Configuration by configurations.creating
 val nativeAndroidDependency: Configuration by configurations.creating
 
+val prebuiltNativeArtifacts =
+        providers.gradleProperty("prebuiltNativeArtifacts")
+
 dependencies {
-    nativeDesktopDependency(project(":devolay-natives", "nativeArtifacts"))
+    if (prebuiltNativeArtifacts.isPresent) {
+        val prebuiltNativeJar =
+                rootProject.file(prebuiltNativeArtifacts.get())
+
+        require(prebuiltNativeJar.isFile) {
+            "Prebuilt native artifacts JAR does not exist: " +
+                    prebuiltNativeJar
+        }
+
+        nativeDesktopDependency(files(prebuiltNativeJar))
+    } else {
+        nativeDesktopDependency(
+                project(":devolay-natives", "nativeArtifacts"))
+    }
+
     ndiDesktopDependency(project(":devolay-natives", "integratedNdiArtifacts"))
     nativeAndroidDependency(project(":devolay-natives", "androidArtifacts"))
 }

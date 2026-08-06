@@ -30,3 +30,6 @@ for line in iter(proc.stderr.readline, b''):
         print(f"gcc version {major_version}.{minor_version}.{patch_version} (GCC)", file=sys.stderr)
     else:
         print(line.decode("utf-8"), file=sys.stderr, end="")
+
+# Propagate the real compiler exit status to Gradle.
+sys.exit(proc.wait())
