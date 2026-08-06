@@ -603,6 +603,40 @@ jobs:
           print(f"Created {target}")
           PY_JRELEASER
 
+      - name: Install PomChecker
+        run: |
+          set -euo pipefail
+
+          pomchecker_version="1.15.0"
+          pomchecker_root="$RUNNER_TEMP/pomchecker-${pomchecker_version}"
+
+          curl \
+            --fail \
+            --location \
+            --retry 5 \
+            --output "$RUNNER_TEMP/pomchecker.zip" \
+            "https://github.com/kordamp/pomchecker/releases/download/v${pomchecker_version}/pomchecker-${pomchecker_version}.zip"
+
+          rm -rf "$pomchecker_root"
+          unzip -q "$RUNNER_TEMP/pomchecker.zip" -d "$RUNNER_TEMP"
+
+          pomchecker_bin="$pomchecker_root/bin/pomchecker"
+
+          if [ ! -f "$pomchecker_bin" ]; then
+            echo "PomChecker executable was not found:" >&2
+            find "$RUNNER_TEMP" \
+              -maxdepth 4 \
+              -type f \
+              -name 'pomchecker*' \
+              -print >&2
+            exit 1
+          fi
+
+          chmod +x "$pomchecker_bin"
+          echo "$pomchecker_root/bin" >> "$GITHUB_PATH"
+
+          test -x "$pomchecker_bin"
+
       - name: Validate Central bundle with JReleaser
         uses: jreleaser/release-action@v2
         with:
