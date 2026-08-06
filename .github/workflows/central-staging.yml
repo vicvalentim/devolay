@@ -637,6 +637,12 @@ jobs:
 
           test -x "$pomchecker_bin"
 
+          echo "PomChecker executable:"
+          ls -l "$pomchecker_bin"
+
+          echo "PomChecker version:"
+          "$pomchecker_bin" --version
+
       - name: Validate Central bundle with JReleaser
         uses: jreleaser/release-action@v2
         with:
