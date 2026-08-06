@@ -309,7 +309,7 @@ val assembleIntegratedNDIArtifacts by tasks.registering(Jar::class) {
                             nativeLibParentPath = file("../NDI SDK for Linux/lib/x86_64-linux-gnu").toPath()
                         }
                     }
-                    if (nativeLibParentPath != null) {
+                    if (nativeLibParentPath != null && Files.exists(nativeLibParentPath)) {
                         nativeLibPath = Files.walk(nativeLibParentPath).filter {
                             Files.isRegularFile(it) && Files.size(it) > 10 * 1000
                         }.findFirst().orElse(null)
