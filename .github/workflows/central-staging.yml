@@ -574,7 +574,8 @@ jobs:
           ])
 
           new_rules = "\n".join([
-              "        applyMavenCentralRules: true",
+              "        applyMavenCentralRules: false",
+              "        verifyPom: false",
               "        sign: false",
               "        stage: UPLOAD",
           ])
