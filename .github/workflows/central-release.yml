@@ -620,6 +620,13 @@ jobs:
           print(f"Created {target}")
           PY_JRELEASER_UPLOAD
 
+          grep -q '^        authorization: BEARER$' \
+            build/jreleaser-upload.yml \
+            || {
+              echo "ERROR: Maven Central authorization must be BEARER."
+              exit 1
+            }
+
       - name: Install PomChecker
         run: |
           set -euo pipefail
