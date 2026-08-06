@@ -45,15 +45,36 @@ tasks.withType(CppCompile::class).configureEach {
         if (this@configureEach.name.toLowerCase().contains("windows")) {
             when (toolChain) {
                 is VisualCpp -> listOf("/std:c++11")
-                is Gcc -> listOf("-lstdc++", "-std=c++11", "-static-libgcc", "-static-libstdc++")
-                is Clang -> listOf("-lstdc++", "-std=c++11", "-static-libstdc++")
+                is Gcc -> listOf(
+                        "-lstdc++",
+                        "-std=c++11",
+                        "-static-libgcc",
+                        "-static-libstdc++")
+                is Clang -> listOf(
+                        "-lstdc++",
+                        "-std=c++11",
+                        "-static-libstdc++")
+                else -> listOf()
+            }
+        } else if (OperatingSystem.current().isMacOsX && this@configureEach.name.toLowerCase().contains("macos")) {
+            when (toolChain) {
+                is Gcc, is Clang -> listOf("-std=c++11")
                 else -> listOf()
             }
         } else {
             when (toolChain) {
                 is VisualCpp -> listOf("/std:c++11")
-                is Gcc -> listOf("-lstdc++", "-std=c++11", "-static-libgcc", "-static-libstdc++", "-ldl")
-                is Clang -> listOf("-lstdc++", "-std=c++11", "-static-libstdc++", "-ldl")
+                is Gcc -> listOf(
+                        "-lstdc++",
+                        "-std=c++11",
+                        "-static-libgcc",
+                        "-static-libstdc++",
+                        "-ldl")
+                is Clang -> listOf(
+                        "-lstdc++",
+                        "-std=c++11",
+                        "-static-libstdc++",
+                        "-ldl")
                 else -> listOf()
             }
         }
@@ -67,16 +88,55 @@ tasks.withType(CppCompile::class).configureEach {
 
 tasks.withType(LinkSharedLibrary::class).configureEach {
     linkerArgs.addAll(toolChain.map { toolChain ->
-        if (this@configureEach.name.toLowerCase().contains("windows")) {
+        val taskName = this@configureEach.name.toLowerCase()
+
+        if (taskName.contains("windows")) {
             when (toolChain) {
-                is Gcc -> listOf("-shared", "-static-libgcc", "-static-libstdc++")
-                is Clang -> listOf("-shared", "-static-libstdc++")
+                is Gcc -> listOf(
+                        "-shared",
+                        "-static-libgcc",
+                        "-static-libstdc++")
+                is Clang -> listOf(
+                        "-shared",
+                        "-static-libstdc++")
                 else -> listOf()
+            }
+        } else if (taskName.contains("macos")) {
+            if (OperatingSystem.current().isMacOsX) {
+                when (toolChain) {
+                    is Gcc, is Clang -> listOf(
+                            "-shared",
+                            "-Wl,-install_name,@rpath/libdevolay-natives.dylib")
+                    else -> listOf()
+                }
+            } else {
+                // Preserve the existing osxcross behavior on Linux.
+                when (toolChain) {
+                    is Gcc -> listOf(
+                            "-shared",
+                            "-static-libgcc",
+                            "-static-libstdc++",
+                            "-ldl",
+                            "-Wl,-install_name,@rpath/libdevolay-natives.dylib")
+                    is Clang -> listOf(
+                            "-shared",
+                            "-static-libstdc++",
+                            "-ldl",
+                            "-Wl,-install_name,@rpath/libdevolay-natives.dylib")
+                    else -> listOf()
+                }
             }
         } else {
             when (toolChain) {
-                is Gcc -> listOf("-shared", "-static-libgcc", "-static-libstdc++", "-ldl")
-                is Clang -> listOf("-shared", "-static-libstdc++", "-ldl")
+                is Gcc -> listOf(
+                        "-shared",
+                        "-static-libgcc",
+                        "-static-libstdc++",
+                        "-ldl")
+                is Clang -> listOf(
+                        "-shared",
+                        "-static-libstdc++",
+                        "-ldl")
                 else -> listOf()
             }
         }
@@ -92,6 +152,7 @@ library {
     targetMachines.set(listOf(
             machines.windows.x86, machines.windows.x86_64,
             machines.macOS.x86_64,
+            machines.macOS.architecture("aarch64"),
             machines.linux.x86, machines.linux.x86_64,
             machines.os("android").architecture("armv7a"),
             machines.os("android").architecture("arm64-v8a"),
@@ -189,6 +250,7 @@ val assembleNativeArtifacts by tasks.registering(Jar::class) {
                         into("natives/" + machine.operatingSystemFamily.name + "/" + machine.architecture.name)
                         exclude("*.lib")
                         exclude("*.debug")
+                        exclude("*.dwarf")
                     }
                 }
             }
@@ -247,7 +309,7 @@ val assembleIntegratedNDIArtifacts by tasks.registering(Jar::class) {
                             nativeLibParentPath = file("../NDI SDK for Linux/lib/x86_64-linux-gnu").toPath()
                         }
                     }
-                    if (nativeLibParentPath != null) {
+                    if (nativeLibParentPath != null && Files.exists(nativeLibParentPath)) {
                         nativeLibPath = Files.walk(nativeLibParentPath).filter {
                             Files.isRegularFile(it) && Files.size(it) > 10 * 1000
                         }.findFirst().orElse(null)

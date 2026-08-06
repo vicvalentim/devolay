@@ -74,6 +74,14 @@ open class ToolchainConfiguration : RuleSource() {
             }
         }
 
+        // On macOS, use the locally installed Apple Clang toolchain.
+        if (OperatingSystem.current().isMacOsX) {
+            register<Clang>("appleClang") {
+                target("macos_x86-64")
+                target("macos_aarch64")
+            }
+        }
+
         // On windows, compile using visualcpp or gcc. Unfortunately, cross compile from windows isn't really possible
         if (OperatingSystem.current().isWindows) {
             register<VisualCpp>("visualCpp")

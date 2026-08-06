@@ -1,0 +1,34 @@
+project:
+  name: devolay
+  version: 2.1.1-vic.1
+  versionPattern: SEMVER
+  description: Community-maintained fork of Devolay with macOS Apple Silicon support.
+  authors:
+    - Walker Knapp
+    - Victor Valentim
+  license: Apache-2.0
+  links:
+    homepage: https://github.com/vicvalentim/devolay
+  languages:
+    java:
+      groupId: io.github.vicvalentim
+      artifactId: devolay
+      version: 8
+
+signing:
+  active: ALWAYS
+  pgp:
+    active: ALWAYS
+    armored: true
+
+deploy:
+  maven:
+    mavenCentral:
+      central:
+        active: RELEASE
+        url: https://central.sonatype.com/api/v1/publisher
+        namespace: io.github.vicvalentim
+        applyMavenCentralRules: true
+        stage: UPLOAD
+        stagingRepositories:
+          - devolay-java/build/staging-deploy
