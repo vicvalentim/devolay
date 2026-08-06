@@ -50,7 +50,7 @@ jobs:
         sudo ln -s `pwd`/.github/workflows/g++-faker.py /usr/bin/i686-w64-mingw32-g++-faker
         sudo ln -s `pwd`/.github/workflows/g++-faker.py /usr/bin/x86_64-w64-mingw32-g++-faker
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v4
       id: cacheNDI
       with:
         path: 'NDI SDK*'
@@ -76,7 +76,7 @@ jobs:
         mv "NDI SDK for macOS" "NDI SDK for Apple"
         rm Install_NDI_SDK_v5_macOS.pkg && rm Payload~
 
-    - uses: actions/cache@v2
+    - uses: actions/cache@v4
       id: cachetoolchain
       with:
         path: osxcross
@@ -109,7 +109,7 @@ jobs:
         ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v1
+      uses: actions/upload-artifact@v4
       with:
         name: build-artifacts
         path: devolay-java/build/libs
