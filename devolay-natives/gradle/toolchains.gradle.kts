@@ -1,3 +1,5 @@
+// This file has been modified from the original WalkerKnapp/devolay version by the vicvalentim/devolay community-maintained fork (2026).
+
 import org.gradle.internal.os.OperatingSystem
 import org.gradle.nativeplatform.toolchain.internal.tools.ToolSearchPath
 import org.gradle.nativeplatform.toolchain.internal.ToolType

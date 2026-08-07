@@ -1,3 +1,5 @@
+// This file has been modified from the original WalkerKnapp/devolay version by the vicvalentim/devolay community-maintained fork (2026).
+
 import de.undercouch.gradle.tasks.download.Download
 import org.gradle.internal.jvm.Jvm
 import org.gradle.internal.os.OperatingSystem
@@ -240,6 +242,71 @@ fun locateNdiIncludes(): Path {
     }
 }
 
+// Resolve a complete NDI SDK for optional integrated packaging.
+// Vendored MIT headers are intentionally not considered a complete SDK here.
+fun locateIntegratedNdiSdkRoot(platform: String): Path? {
+    val explicitProperty = System.getProperty("ndiSdk")
+    if (!explicitProperty.isNullOrBlank()) {
+        return file(explicitProperty).toPath()
+    }
+
+    val environmentPath = System.getenv("NDI_SDK_DIR")
+    if (!environmentPath.isNullOrBlank()) {
+        return file(environmentPath).toPath()
+    }
+
+    if (platform == "macos" &&
+            file("/Library/NDI SDK for Apple").exists()) {
+        return file("/Library/NDI SDK for Apple").toPath()
+    }
+
+    val checkoutCandidate = when (platform) {
+        "windows" -> file("../NDI SDK for Windows").toPath()
+        "macos" -> file("../NDI SDK for Apple").toPath()
+        "linux" -> file("../NDI SDK for Linux").toPath()
+        else -> null
+    }
+
+    return checkoutCandidate?.takeIf { Files.exists(it) }
+}
+
+fun requireIntegratedNdiFile(
+        path: Path,
+        description: String,
+        platform: String,
+        architecture: String): Path {
+    if (!Files.exists(path) || !Files.isRegularFile(path)) {
+        throw GradleException(
+                "Integrated NDI packaging requested, but $description was not found at " +
+                "$path for $platform/$architecture.")
+    }
+    return path
+}
+
+// Integrated NDI runtime packaging is explicitly opt-in.
+val enableIntegratedNdi =
+        providers.gradleProperty("enableIntegratedNdi")
+                .map { it.toBoolean() }
+                .orElse(false)
+
+// Public CI must not package proprietary NDI runtime binaries accidentally.
+// Controlled/private CI may override this guard explicitly.
+val allowIntegratedNdiInCi =
+        providers.gradleProperty("allowIntegratedNdiInCi")
+                .map { it.toBoolean() }
+                .orElse(false)
+
+val runningInCi =
+        System.getenv("CI")?.equals("true", ignoreCase = true) == true
+
+if (enableIntegratedNdi.get() &&
+        runningInCi &&
+        !allowIntegratedNdiInCi.get()) {
+    throw GradleException(
+            "Integrated NDI packaging is disabled in CI by default. " +
+            "Use -PallowIntegratedNdiInCi=true only in a controlled environment.")
+}
+
 // Add artifacts for devolay-java to depend on
 val assembleNativeArtifacts by tasks.registering(Jar::class) {
     archiveBaseName.set("devolay-native-artifacts")
@@ -267,104 +334,159 @@ val assembleNativeArtifacts by tasks.registering(Jar::class) {
 val assembleIntegratedNDIArtifacts by tasks.registering(Jar::class) {
     archiveBaseName.set("ndi-lib-artifacts")
     destinationDirectory.set(temporaryDir)
+    enabled = enableIntegratedNdi.get()
 
-    components.withType(ComponentWithBinaries::class).forEach { component ->
-        (component as ComponentWithBinaries).binaries.whenElementFinalized(ComponentWithOutputs::class.java) {
-            if (this is ComponentWithNativeRuntime && this.isOptimized) {
-                val machine = this.targetMachine
+    if (enableIntegratedNdi.get()) {
+        components.withType(ComponentWithBinaries::class).forEach { component ->
+            (component as ComponentWithBinaries).binaries.whenElementFinalized(ComponentWithOutputs::class.java) {
+                if (this is ComponentWithNativeRuntime && this.isOptimized) {
+                    val machine = this.targetMachine
+                    val platform = machine.operatingSystemFamily.name
+                    val architecture = machine.architecture.name
 
-                var nativeLibPath: Path? = null;
-                val nativeLicensePaths: MutableList<Path> = mutableListOf();
-                var nativeLibName: String? = null;
-
-                // Skip android binaries because we package them separately
-                if (machine.operatingSystemFamily.name == "android") {
-                    return@whenElementFinalized
-                }
-
-                if (machine.operatingSystemFamily.name == "windows") {
-                    nativeLibName = "ndi.dll"
-                    when (machine.architecture.name) {
-                        "x86" -> {
-                            nativeLibPath = file("../NDI SDK for Windows/Bin/x86/Processing.NDI.Lib.x86.dll").toPath()
-                            nativeLicensePaths.add(file("../NDI SDK for Windows/Bin/x86/Processing.NDI.Lib.Licenses.txt").toPath())
-                        }
-                        "x86-64" -> {
-                            nativeLibPath = file("../NDI SDK for Windows/Bin/x64/Processing.NDI.Lib.x64.dll").toPath()
-                            nativeLicensePaths.add(file("../NDI SDK for Windows/Bin/x64/Processing.NDI.Lib.Licenses.txt").toPath())
-                        }
-                    }
-                } else if (machine.operatingSystemFamily.name == "macos") {
-                    nativeLibName = "libndi.dylib"
-
-                    val ndiSdkRoot: Path? = when {
-                        System.getProperty("ndiSdk") != null ->
-                            file(System.getProperty("ndiSdk")).toPath()
-
-                        System.getenv("NDI_SDK_DIR") != null ->
-                            file(System.getenv("NDI_SDK_DIR")).toPath()
-
-                        OperatingSystem.current().isMacOsX &&
-                                file("/Library/NDI SDK for Apple").exists() ->
-                            file("/Library/NDI SDK for Apple").toPath()
-
-                        file("../NDI SDK for Apple").exists() ->
-                            file("../NDI SDK for Apple").toPath()
-
-                        else -> null
+                    // Android has its own packaging path below.
+                    if (platform == "android") {
+                        return@whenElementFinalized
                     }
 
-                    // Current NDI SDK for Apple ships libndi.dylib as a
-                    // universal binary supporting Intel and Apple Silicon.
-                    if (machine.architecture.name == "x86-64" ||
-                            machine.architecture.name == "aarch64") {
-                        if (ndiSdkRoot != null) {
-                            nativeLibPath =
-                                ndiSdkRoot.resolve("lib/macOS/libndi.dylib")
-                            nativeLicensePaths.add(
-                                ndiSdkRoot.resolve("licenses/libndi_licenses.txt")
-                            )
-                        }
-                    }
-                } else if (machine.operatingSystemFamily.name == "linux") {
-                    nativeLibName = "libndi.so"
-                    nativeLicensePaths.add(file("../NDI SDK for Linux/licenses/libndi_licenses.txt").toPath())
-                    // The linux libs have 2 symlinks and 1 regular file in the lib folder, find the regular file
-                    var nativeLibParentPath: Path? = null;
-                    when (machine.architecture.name) {
-                        "x86" -> {
-                            nativeLibParentPath = file("../NDI SDK for Linux/lib/i686-linux-gnu").toPath()
-                        }
-                        "x86-64" -> {
-                            nativeLibParentPath = file("../NDI SDK for Linux/lib/x86_64-linux-gnu").toPath()
-                        }
-                    }
-                    if (nativeLibParentPath != null && Files.exists(nativeLibParentPath)) {
-                        nativeLibPath = Files.walk(nativeLibParentPath).filter {
-                            Files.isRegularFile(it) && Files.size(it) > 10 * 1000
-                        }.findFirst().orElse(null)
-                    }
-                }
+                    // Modern integrated desktop support is intentionally 64-bit.
+                    // Legacy 32-bit native targets remain available to the normal
+                    // Devolay build, but are not packaged with an NDI runtime.
+                    val supportedIntegratedTarget =
+                            (platform == "windows" &&
+                                    architecture == "x86-64") ||
+                            (platform == "macos" &&
+                                    (architecture == "x86-64" ||
+                                            architecture == "aarch64")) ||
+                            (platform == "linux" &&
+                                    architecture == "x86-64")
 
-                if (nativeLibPath != null) {
-                    if (Files.exists(nativeLibPath)) {
-                        println("Adding NDI lib from " + nativeLibPath.toString() + " to integrated build.")
-                        from(nativeLibPath!!) {
-                            rename {
-                                nativeLibName!!
+                    if (!supportedIntegratedTarget) {
+                        return@whenElementFinalized
+                    }
+
+                    val ndiSdkRoot =
+                            locateIntegratedNdiSdkRoot(platform)
+                                    ?: throw GradleException(
+                                            "Integrated NDI packaging requested for " +
+                                                    "$platform/$architecture, but no complete " +
+                                                    "NDI SDK was found. Set -DndiSdk=<path> or " +
+                                                    "NDI_SDK_DIR=<path>.")
+
+                    val (nativeLibName, nativeLibPath, nativeLicensePath) =
+                            when (platform) {
+                                "windows" -> {
+                                    val runtime =
+                                            requireIntegratedNdiFile(
+                                                    ndiSdkRoot.resolve(
+                                                            "Bin/x64/Processing.NDI.Lib.x64.dll"),
+                                                    "NDI runtime",
+                                                    platform,
+                                                    architecture)
+
+                                    val license =
+                                            requireIntegratedNdiFile(
+                                                    ndiSdkRoot.resolve(
+                                                            "Bin/x64/Processing.NDI.Lib.Licenses.txt"),
+                                                    "NDI runtime license file",
+                                                    platform,
+                                                    architecture)
+
+                                    Triple("ndi.dll", runtime, license)
+                                }
+
+                                "macos" -> {
+                                    // Current NDI SDK for Apple ships a universal
+                                    // libndi.dylib for Intel and Apple Silicon.
+                                    val runtime =
+                                            requireIntegratedNdiFile(
+                                                    ndiSdkRoot.resolve(
+                                                            "lib/macOS/libndi.dylib"),
+                                                    "NDI runtime",
+                                                    platform,
+                                                    architecture)
+
+                                    val license =
+                                            requireIntegratedNdiFile(
+                                                    ndiSdkRoot.resolve(
+                                                            "licenses/libndi_licenses.txt"),
+                                                    "NDI runtime license file",
+                                                    platform,
+                                                    architecture)
+
+                                    Triple("libndi.dylib", runtime, license)
+                                }
+
+                                "linux" -> {
+                                    val runtimeDirectory =
+                                            ndiSdkRoot.resolve(
+                                                    "lib/x86_64-linux-gnu")
+
+                                    if (!Files.exists(runtimeDirectory) ||
+                                            !Files.isDirectory(runtimeDirectory)) {
+                                        throw GradleException(
+                                                "Integrated NDI packaging requested, but " +
+                                                        "the NDI runtime directory was not found at " +
+                                                        "$runtimeDirectory for " +
+                                                        "$platform/$architecture.")
+                                    }
+
+                                    // Linux SDK distributions may provide libndi.so
+                                    // symlinks plus a versioned regular binary.
+                                    // Package the actual binary, not a symlink.
+                                    val runtime =
+                                            Files.newDirectoryStream(
+                                                    runtimeDirectory).use { entries ->
+                                                entries.asSequence()
+                                                        .firstOrNull {
+                                                            Files.isRegularFile(it) &&
+                                                                    !Files.isSymbolicLink(it) &&
+                                                                    it.fileName.toString()
+                                                                            .startsWith("libndi.so") &&
+                                                                    Files.size(it) > 10 * 1000
+                                                        }
+                                            } ?: throw GradleException(
+                                                    "Integrated NDI packaging requested, but " +
+                                                            "no regular libndi.so runtime binary " +
+                                                            "was found in $runtimeDirectory for " +
+                                                            "$platform/$architecture.")
+
+                                    val license =
+                                            requireIntegratedNdiFile(
+                                                    ndiSdkRoot.resolve(
+                                                            "licenses/libndi_licenses.txt"),
+                                                    "NDI runtime license file",
+                                                    platform,
+                                                    architecture)
+
+                                    Triple("libndi.so", runtime, license)
+                                }
+
+                                else -> return@whenElementFinalized
                             }
-                            into("natives/" + machine.operatingSystemFamily.name + "/" + machine.architecture.name)
+
+                    println(
+                            "Adding NDI lib from $nativeLibPath " +
+                                    "to integrated build.")
+
+                    from(nativeLibPath) {
+                        rename {
+                            nativeLibName
                         }
-                        nativeLicensePaths.forEach {
-                            from(it) {
-                                into("natives/" + machine.operatingSystemFamily.name + "/" + machine.architecture.name)
-                            }
-                        }
-                    } else {
-                        System.err.println("Could not find NDI lib in expected location (" + nativeLibPath.toString() + ") for OS \"" + machine.operatingSystemFamily.name + "\" and arch \"" + machine.architecture.name + "\". No integrated builds available.");
+                        into(
+                                "natives/" +
+                                        platform +
+                                        "/" +
+                                        architecture)
                     }
-                } else {
-                    System.err.println("No NDI path specified for OS \"" + machine.operatingSystemFamily.name + "\" and arch \"" + machine.architecture.name + "\", no integrated builds available.")
+
+                    from(nativeLicensePath) {
+                        into(
+                                "natives/" +
+                                        platform +
+                                        "/" +
+                                        architecture)
+                    }
                 }
             }
         }

@@ -3,21 +3,6 @@ name: Maven Central staging
 on:
   workflow_dispatch:
 
-  push:
-    branches:
-      - feature/central-publishing
-    paths:
-      - ".github/workflows/central-staging.yml"
-      - '.github/workflows/g\+\+-faker.py'
-      - "build.gradle.kts"
-      - "settings.gradle.kts"
-      - "gradle/**"
-      - "gradlew"
-      - "gradlew.bat"
-      - "devolay-java/**"
-      - "devolay-natives/**"
-      - "jreleaser.yml"
-
   pull_request:
     paths:
       - ".github/workflows/central-staging.yml"

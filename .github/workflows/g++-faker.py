@@ -1,4 +1,6 @@
 #!/bin/python3
+# This file has been modified from the original WalkerKnapp/devolay version by the vicvalentim/devolay community-maintained fork (2026).
+
 
 import subprocess
 import sys
