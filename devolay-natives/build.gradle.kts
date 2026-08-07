@@ -296,10 +296,34 @@ val assembleIntegratedNDIArtifacts by tasks.registering(Jar::class) {
                     }
                 } else if (machine.operatingSystemFamily.name == "macos") {
                     nativeLibName = "libndi.dylib"
-                    nativeLicensePaths.add(file("../NDI SDK for Apple/licenses/libndi_licenses.txt").toPath())
-                    when (machine.architecture.name) {
-                        "x86-64" -> {
-                            nativeLibPath = file("../NDI SDK for Apple/lib/macOS/libndi.dylib").toPath()
+
+                    val ndiSdkRoot: Path? = when {
+                        System.getProperty("ndiSdk") != null ->
+                            file(System.getProperty("ndiSdk")).toPath()
+
+                        System.getenv("NDI_SDK_DIR") != null ->
+                            file(System.getenv("NDI_SDK_DIR")).toPath()
+
+                        OperatingSystem.current().isMacOsX &&
+                                file("/Library/NDI SDK for Apple").exists() ->
+                            file("/Library/NDI SDK for Apple").toPath()
+
+                        file("../NDI SDK for Apple").exists() ->
+                            file("../NDI SDK for Apple").toPath()
+
+                        else -> null
+                    }
+
+                    // Current NDI SDK for Apple ships libndi.dylib as a
+                    // universal binary supporting Intel and Apple Silicon.
+                    if (machine.architecture.name == "x86-64" ||
+                            machine.architecture.name == "aarch64") {
+                        if (ndiSdkRoot != null) {
+                            nativeLibPath =
+                                ndiSdkRoot.resolve("lib/macOS/libndi.dylib")
+                            nativeLicensePaths.add(
+                                ndiSdkRoot.resolve("licenses/libndi_licenses.txt")
+                            )
                         }
                     }
                 } else if (machine.operatingSystemFamily.name == "linux") {
