@@ -4,7 +4,9 @@ plugins {
 }
 
 sourceCompatibility = JavaVersion.VERSION_1_8
-mainClassName = 'me.walkerknapp.devolayexamples.SendAudioExample'
+application {
+    mainClass = 'me.walkerknapp.devolayexamples.SendAudioExample'
+}
 
 repositories {
     mavenCentral()
@@ -17,31 +19,31 @@ dependencies {
 }
 
 task executeSendAudioExample(type:JavaExec) {
-    main = "me.walkerknapp.devolayexamples.SendAudioExample"
+    mainClass = "me.walkerknapp.devolayexamples.SendAudioExample"
     classpath = sourceSets.main.runtimeClasspath
 }
 
 task executeRecvExample(type:JavaExec) {
-    main = "me.walkerknapp.devolayexamples.RecvExample"
+    mainClass = "me.walkerknapp.devolayexamples.RecvExample"
     classpath = sourceSets.main.runtimeClasspath
 }
 
 task executeSendVideoExample(type:JavaExec) {
-    main = "me.walkerknapp.devolayexamples.SendVideoExample"
+    mainClass = "me.walkerknapp.devolayexamples.SendVideoExample"
     classpath = sourceSets.main.runtimeClasspath
 }
 
 task executeRecordingExample(type:JavaExec) {
-    main = "me.walkerknapp.devolayexamples.recording.RecordingExample"
+    mainClass = "me.walkerknapp.devolayexamples.recording.RecordingExample"
     classpath = sourceSets.main.runtimeClasspath
 }
 
 task executeMonitorExample(type:JavaExec) {
-    main = "me.walkerknapp.devolayexamples.MonitorExample"
+    mainClass = "me.walkerknapp.devolayexamples.MonitorExample"
     classpath = sourceSets.main.runtimeClasspath
 }
 
 task executeFrameSyncExample(type:JavaExec) {
-    main = "me.walkerknapp.devolayexamples.FrameSyncExample"
+    mainClass = "me.walkerknapp.devolayexamples.FrameSyncExample"
     classpath = sourceSets.main.runtimeClasspath
 }
