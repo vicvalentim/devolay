@@ -22,6 +22,9 @@ namespace fs = ghc::filesystem;
 
 #include "../headers/me_walkerknapp_devolay_Devolay.h"
 
+// Devolay intentionally uses the NDIlib_v3 dynamic API as its ABI
+// compatibility baseline. Current NDI runtimes continue to export
+// NDIlib_v3_load, including NDI 6.x.
 static const NDIlib_v3 *ndiLib = (NDIlib_v3 *)calloc(1, sizeof(NDIlib_v3));
 
 const NDIlib_v3 *getNDILib() {
@@ -47,9 +50,16 @@ JNIEXPORT jint JNICALL Java_me_walkerknapp_devolay_Devolay_nLoadLibraries(JNIEnv
     locations.emplace_back(fs::path(std::string("/usr/local/lib/") + NDILIB_LIBRARY_NAME));
 #endif
 #if defined(__APPLE__)
-    locations.emplace_back(fs::path(std::string("/Library/NDI SDK for Apple/lib/x64/") + NDILIB_LIBRARY_NAME));
-#endif
+// Current NDI SDK for Apple layout.
+locations.emplace_back(fs::path(
+        std::string("/Library/NDI SDK for Apple/lib/macOS/")
+        + NDILIB_LIBRARY_NAME));
 
+// Legacy NDI SDK layout retained for backward compatibility.
+locations.emplace_back(fs::path(
+        std::string("/Library/NDI SDK for Apple/lib/x64/")
+        + NDILIB_LIBRARY_NAME));
+#endif
 
     for(const fs::path& possibleLibPath : locations) {
 
@@ -77,7 +87,10 @@ JNIEXPORT jint JNICALL Java_me_walkerknapp_devolay_Devolay_nLoadLibraries(JNIEnv
                 } else {
                     FreeLibrary(hNDILib);
 
-                    printf("Failed to load NDI_v3_load function.");
+                    printf(
+                        "NDI library '%s' does not export NDIlib_v3_load.\n",
+                        possibleLibPath.string().c_str()
+                    );
                     return -2;
                 }
             } else {
@@ -98,11 +111,19 @@ JNIEXPORT jint JNICALL Java_me_walkerknapp_devolay_Devolay_nLoadLibraries(JNIEnv
                 } else {
                     dlclose(hNDILib);
 
-                    printf("Failed to load NDI_v3_load function.");
+                    printf(
+                    "NDI library '%s' does not export NDIlib_v3_load.\n",
+                    possibleLibPath.string().c_str()
+                );
                     return -2;
                 }
             } else {
-                printf("Library failed to load.");
+                const char* error = dlerror();
+                printf(
+                    "Failed to load NDI library '%s': %s\n",
+                    possibleLibPath.string().c_str(),
+                    error != nullptr ? error : "unknown error"
+                );
             }
 #endif
         }
