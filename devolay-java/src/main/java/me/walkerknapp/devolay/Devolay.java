@@ -29,7 +29,7 @@ public class Devolay {
                     "/natives/" + osDirectory + "/" + archDirectory + "/" + ndiLibraryName);
 
             if (devolayNativesPath == null) {
-                throw new IllegalStateException("This build of Devolay is not compiled for your OS. Please use a different build or follow the compilation instructions on https://github.com/WalkerKnapp/devolay.");
+                throw new IllegalStateException("This build of Devolay is not compiled for your OS. Please use a different build or follow the compilation instructions in the vicvalentim/devolay repository.");
             }
 
             if (ndiLibraryPath != null) {
@@ -48,19 +48,19 @@ public class Devolay {
             if (ret != 0) {
                 // The libraries are not correctly installed.
                 if (ret == -1) {
-                    throw new IllegalStateException("The NDI(tm) SDK libraries were not found.");
+                    throw new IllegalStateException("The NDI Runtime libraries were not found.");
                 } else if (ret == -2) {
-                    throw new IllegalStateException("The NDI(tm) SDK libraries failed to load. Please reinstall.");
+                    throw new IllegalStateException("The NDI Runtime libraries failed to load. Please reinstall the NDI Runtime.");
                 }
             }
         } catch (UnsatisfiedLinkError e) {
             if (osDirectory.equals("android")) {
                 throw new IllegalStateException("Devolay natives failed to load correctly." +
                         " Please ensure that you are using the android-specific builds!" +
-                        " See https://github.com/WalkerKnapp/devolay#android-builds.", e);
+                        " See the Android section of the vicvalentim/devolay README.", e);
             } else {
                 throw new IllegalStateException("Devolay natives failed to load correctly. This is likely because this build of Devolay is not compiled for your OS." +
-                        " Please use a different build or follow the compilation instructions on https://github.com/WalkerKnapp/devolay.", e);
+                        " Please use a different build or follow the compilation instructions in the vicvalentim/devolay repository.", e);
             }
         }
     }
@@ -77,7 +77,7 @@ public class Devolay {
         } else if (osNameProperty.contains("mac")) {
             return "macos";
         } else {
-            throw new IllegalStateException("Unsupported OS: " + osNameProperty + ". Please open an issue at https://github.com/WalkerKnapp/devolay/issues");
+            throw new IllegalStateException("Unsupported OS: " + osNameProperty + ". Please open an issue in the vicvalentim/devolay issue tracker");
         }
     }
 
@@ -94,7 +94,7 @@ public class Devolay {
         } else if (osArchProperty.contains("86")) {
             return "x86";
         } else {
-            throw new IllegalStateException("Unsupported Arch: " + osArchProperty + ". Please open an issue at https://github.com/WalkerKnapp/devolay/issues");
+            throw new IllegalStateException("Unsupported Arch: " + osArchProperty + ". Please open an issue in the vicvalentim/devolay issue tracker");
         }
     }
 
@@ -144,7 +144,9 @@ public class Devolay {
     }
 
     /**
-     * Loads the NDI run-time from the NDI Redist Environment Variable (NDI_RUNTIME_DIR_V3)
+     * Loads the NDI runtime using the runtime directory defined by the active
+     * NDI SDK headers, an integrated runtime when present, or supported
+     * platform-specific runtime locations.
      *
      * @return An int representing the success of the library loading.
      *      0 - Success
@@ -169,18 +171,18 @@ public class Devolay {
     }
 
     /**
-     * Returns the current version of the underlying NDI(tm) library runtime.
+     * Returns the current version of the underlying NDI library runtime.
      *
-     * @return A string containing the version of the NDI(tm) runtimes.
+     * @return A string containing the version of the NDI runtimes.
      */
     public static String getNDIVersion() {
         return nGetVersion();
     }
 
     /**
-     * Returns whether the current CPU in the system is capable of running NDI(tm), and by extension, Devolay.
+     * Returns whether the current CPU in the system is capable of running NDI, and by extension, Devolay.
      *
-     * @return true if the system's CPU is capable of running NDI(tm), false if it is not capable.
+     * @return true if the system's CPU is capable of running NDI, false if it is not capable.
      */
     public static boolean isSupportedCpu() {
         return nIsSupportedCpu();
