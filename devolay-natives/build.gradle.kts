@@ -240,11 +240,70 @@ fun locateNdiIncludes(): Path {
     }
 }
 
+// Resolve a complete NDI SDK for optional integrated packaging.
+// Vendored MIT headers are intentionally not considered a complete SDK here.
+fun locateIntegratedNdiSdkRoot(platform: String): Path? {
+    val explicitProperty = System.getProperty("ndiSdk")
+    if (!explicitProperty.isNullOrBlank()) {
+        return file(explicitProperty).toPath()
+    }
+
+    val environmentPath = System.getenv("NDI_SDK_DIR")
+    if (!environmentPath.isNullOrBlank()) {
+        return file(environmentPath).toPath()
+    }
+
+    if (platform == "macos" &&
+            file("/Library/NDI SDK for Apple").exists()) {
+        return file("/Library/NDI SDK for Apple").toPath()
+    }
+
+    val checkoutCandidate = when (platform) {
+        "windows" -> file("../NDI SDK for Windows").toPath()
+        "macos" -> file("../NDI SDK for Apple").toPath()
+        "linux" -> file("../NDI SDK for Linux").toPath()
+        else -> null
+    }
+
+    return checkoutCandidate?.takeIf { Files.exists(it) }
+}
+
+fun requireIntegratedNdiFile(
+        path: Path,
+        description: String,
+        platform: String,
+        architecture: String): Path {
+    if (!Files.exists(path) || !Files.isRegularFile(path)) {
+        throw GradleException(
+                "Integrated NDI packaging requested, but $description was not found at " +
+                "$path for $platform/$architecture.")
+    }
+    return path
+}
+
 // Integrated NDI runtime packaging is explicitly opt-in.
 val enableIntegratedNdi =
         providers.gradleProperty("enableIntegratedNdi")
                 .map { it.toBoolean() }
                 .orElse(false)
+
+// Public CI must not package proprietary NDI runtime binaries accidentally.
+// Controlled/private CI may override this guard explicitly.
+val allowIntegratedNdiInCi =
+        providers.gradleProperty("allowIntegratedNdiInCi")
+                .map { it.toBoolean() }
+                .orElse(false)
+
+val runningInCi =
+        System.getenv("CI")?.equals("true", ignoreCase = true) == true
+
+if (enableIntegratedNdi.get() &&
+        runningInCi &&
+        !allowIntegratedNdiInCi.get()) {
+    throw GradleException(
+            "Integrated NDI packaging is disabled in CI by default. " +
+            "Use -PallowIntegratedNdiInCi=true only in a controlled environment.")
+}
 
 // Add artifacts for devolay-java to depend on
 val assembleNativeArtifacts by tasks.registering(Jar::class) {
