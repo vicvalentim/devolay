@@ -198,6 +198,12 @@ fun locateNdiIncludes(): Path {
         ndiSdk = file(System.getenv("NDI_SDK_DIR")).toPath()
     }
 
+    // Use the vendored NDI headers when no explicit SDK override was provided.
+    // These headers are individually licensed under MIT by Vizrt NDI AB.
+    if (ndiSdk == null && file("src/main/ndi/include/Processing.NDI.Lib.h").exists()) {
+        return file("src/main/ndi/include").toPath()
+    }
+
     // Check typical install locations
     if (ndiSdk == null && OperatingSystem.current().isWindows && file("C:/Program Files/NDI 4 SDK").exists()) {
         ndiSdk = file("C:/Program Files/NDI 4 SDK").toPath()

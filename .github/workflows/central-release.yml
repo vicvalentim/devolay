@@ -23,89 +23,13 @@ defaults:
 
 env:
   JAVA_VERSION: "11"
-  NDI_SDK_LINUX_URL: >-
-    https://downloads.ndi.tv/SDK/NDI_SDK_Linux/Install_NDI_SDK_v5_Linux.tar.gz
   NATIVE_JAR: >-
     devolay-natives/build/tmp/assembleNativeArtifacts/devolay-native-artifacts.jar
 
 jobs:
-  ndi-headers:
-    name: Prepare NDI headers
-    runs-on: ubuntu-22.04
-
-    steps:
-      - name: Download NDI SDK headers
-        run: |
-          set -euo pipefail
-
-          curl \
-            --fail \
-            --location \
-            --retry 5 \
-            --output ndi-sdk-linux.tar.gz \
-            "$NDI_SDK_LINUX_URL"
-
-          tar -xf ndi-sdk-linux.tar.gz
-
-          installer="$(
-            find . \
-              -maxdepth 1 \
-              -type f \
-              -name 'Install_NDI_SDK*_Linux.sh' \
-              -print \
-              -quit
-          )"
-
-          if [ -z "$installer" ]; then
-            echo "NDI Linux SDK installer was not found." >&2
-            exit 1
-          fi
-
-          sed -i 's/read -p/cat/g' "$installer"
-          PAGER=cat REPLY=y bash "$installer"
-
-          include_dir="$(
-            find . \
-              -maxdepth 4 \
-              -type d \
-              \( -name include -o -name Include \) \
-              -path '*NDI*' \
-              -print \
-              -quit
-          )"
-
-          if [ -z "$include_dir" ]; then
-            echo "NDI SDK include directory was not found." >&2
-            exit 1
-          fi
-
-          mkdir -p ndi-sdk/include
-          cp -R "$include_dir"/. ndi-sdk/include/
-
-          test -f ndi-sdk/include/Processing.NDI.Lib.h
-
-          echo "NDI headers prepared:"
-          find ndi-sdk/include \
-            -maxdepth 1 \
-            -type f \
-            -print \
-            | sort
-
-      - name: Upload NDI headers
-        uses: actions/upload-artifact@v7
-        with:
-          name: ndi-headers
-          path: ndi-sdk
-          if-no-files-found: error
-          retention-days: 1
-
   native-linux-windows:
     name: Linux and Windows natives
-    needs: ndi-headers
     runs-on: ubuntu-22.04
-
-    env:
-      NDI_SDK_DIR: ${{ github.workspace }}/build/ndi-sdk
 
     steps:
       - name: Checkout
@@ -119,12 +43,6 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
-
-      - name: Download NDI headers
-        uses: actions/download-artifact@v8
-        with:
-          name: ndi-headers
-          path: build/ndi-sdk
 
       - name: Install native toolchains
         run: |
@@ -147,9 +65,6 @@ jobs:
           sudo ln -sf \
             "$GITHUB_WORKSPACE/.github/workflows/g++-faker.py" \
             /usr/bin/x86_64-w64-mingw32-g++-faker
-
-          test -f \
-            "$NDI_SDK_DIR/include/Processing.NDI.Lib.h"
 
       - name: Build Linux and Windows natives
         run: |
@@ -213,11 +128,7 @@ jobs:
 
   native-macos:
     name: macOS Intel and Apple Silicon natives
-    needs: ndi-headers
     runs-on: macos-15
-
-    env:
-      NDI_SDK_DIR: ${{ github.workspace }}/build/ndi-sdk
 
     steps:
       - name: Checkout
@@ -232,20 +143,11 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
 
-      - name: Download NDI headers
-        uses: actions/download-artifact@v8
-        with:
-          name: ndi-headers
-          path: build/ndi-sdk
-
       - name: Build macOS natives
         run: |
           set -euo pipefail
 
           chmod +x gradlew
-
-          test -f \
-            "$NDI_SDK_DIR/include/Processing.NDI.Lib.h"
 
           ./gradlew \
             --no-daemon \
@@ -303,14 +205,10 @@ jobs:
   central-staging:
     name: Assemble and upload Maven Central release
     needs:
-      - ndi-headers
       - native-linux-windows
       - native-macos
     runs-on: ubuntu-22.04
     environment: maven-central
-
-    env:
-      NDI_SDK_DIR: ${{ github.workspace }}/build/ndi-sdk
 
     steps:
       - name: Checkout
@@ -324,12 +222,6 @@ jobs:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
-
-      - name: Download NDI headers
-        uses: actions/download-artifact@v8
-        with:
-          name: ndi-headers
-          path: build/ndi-sdk
 
       - name: Download Linux and Windows natives
         uses: actions/download-artifact@v8
@@ -399,9 +291,6 @@ jobs:
       - name: Generate Maven staging repository
         run: |
           set -euo pipefail
-
-          test -f \
-            "$NDI_SDK_DIR/include/Processing.NDI.Lib.h"
 
           rm -rf devolay-java/build/staging-deploy
 
