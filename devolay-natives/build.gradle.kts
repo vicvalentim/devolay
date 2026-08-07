@@ -240,6 +240,12 @@ fun locateNdiIncludes(): Path {
     }
 }
 
+// Integrated NDI runtime packaging is explicitly opt-in.
+val enableIntegratedNdi =
+        providers.gradleProperty("enableIntegratedNdi")
+                .map { it.toBoolean() }
+                .orElse(false)
+
 // Add artifacts for devolay-java to depend on
 val assembleNativeArtifacts by tasks.registering(Jar::class) {
     archiveBaseName.set("devolay-native-artifacts")
@@ -267,7 +273,9 @@ val assembleNativeArtifacts by tasks.registering(Jar::class) {
 val assembleIntegratedNDIArtifacts by tasks.registering(Jar::class) {
     archiveBaseName.set("ndi-lib-artifacts")
     destinationDirectory.set(temporaryDir)
+    enabled = enableIntegratedNdi.get()
 
+    if (enableIntegratedNdi.get()) {
     components.withType(ComponentWithBinaries::class).forEach { component ->
         (component as ComponentWithBinaries).binaries.whenElementFinalized(ComponentWithOutputs::class.java) {
             if (this is ComponentWithNativeRuntime && this.isOptimized) {
@@ -368,6 +376,7 @@ val assembleIntegratedNDIArtifacts by tasks.registering(Jar::class) {
                 }
             }
         }
+    }
     }
 }
 

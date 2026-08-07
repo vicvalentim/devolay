@@ -81,6 +81,13 @@ val nativeAndroidDependency: Configuration by configurations.creating
 val prebuiltNativeArtifacts =
         providers.gradleProperty("prebuiltNativeArtifacts")
 
+// Packaging proprietary NDI runtime binaries is explicitly opt-in.
+// Normal builds and public Maven publications remain runtime-separated.
+val enableIntegratedNdi =
+        providers.gradleProperty("enableIntegratedNdi")
+                .map { it.toBoolean() }
+                .orElse(false)
+
 dependencies {
     if (prebuiltNativeArtifacts.isPresent) {
         val prebuiltNativeJar =
@@ -97,7 +104,10 @@ dependencies {
                 project(":devolay-natives", "nativeArtifacts"))
     }
 
-    ndiDesktopDependency(project(":devolay-natives", "integratedNdiArtifacts"))
+    if (enableIntegratedNdi.get()) {
+        ndiDesktopDependency(
+                project(":devolay-natives", "integratedNdiArtifacts"))
+    }
     nativeAndroidDependency(project(":devolay-natives", "androidArtifacts"))
 }
 
@@ -107,10 +117,15 @@ tasks.jar {
 }
 
 tasks.named<Jar>("integratedJar") {
-    dependsOn(ndiDesktopDependency)
-    dependsOn(nativeDesktopDependency)
-    from(ndiDesktopDependency.map { zipTree(it) })
-    from(nativeDesktopDependency.map { zipTree(it) })
+    // Integrated runtime packaging must be explicitly requested.
+    enabled = enableIntegratedNdi.get()
+
+    if (enableIntegratedNdi.get()) {
+        dependsOn(ndiDesktopDependency)
+        dependsOn(nativeDesktopDependency)
+        from(ndiDesktopDependency.map { zipTree(it) })
+        from(nativeDesktopDependency.map { zipTree(it) })
+    }
 }
 
 val androidAar by tasks.registering(Zip::class) {
