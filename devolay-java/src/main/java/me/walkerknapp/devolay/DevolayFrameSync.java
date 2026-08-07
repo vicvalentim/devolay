@@ -138,7 +138,7 @@ public class DevolayFrameSync extends DevolayFrameCleaner implements AutoCloseab
 
     @Override
     void freeMetadata(DevolayMetadataFrame metadataFrame) {
-        throw new UnsupportedOperationException("Tried to free metadata frame with framesync. This should be unreachable, please open an issue at https://github.com/WalkerKnapp/devolay/issues.");
+        throw new UnsupportedOperationException("Tried to free metadata frame with framesync. This should be unreachable, please open an issue at https://github.com/vicvalentim/devolay/issues.");
     }
 
     // Native methods

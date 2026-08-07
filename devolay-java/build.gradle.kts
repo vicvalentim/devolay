@@ -148,7 +148,7 @@ publishing {
 
             pom {
                 name.set("Devolay Community Fork")
-                description.set("Community-maintained fork of Devolay, a Java library for sending and receiving video over networks using the NDI(tm) SDK.")
+                description.set("Community-maintained fork of Devolay, a Java library for sending and receiving video over networks using the NDI SDK.")
                 url.set("https://github.com/vicvalentim/devolay")
 
                 licenses {
