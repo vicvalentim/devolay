@@ -118,27 +118,47 @@ The same JNI build was also validated against an installed NDI 6.0.1 runtime, de
 
 The original Devolay architecture supported an `integrated` artifact containing both Devolay JNI binaries and NDI runtime binaries.
 
-This fork preserves the ability to generate integrated builds locally.
+This fork preserves that capability as an explicit opt-in for local development, testing, and controlled application packaging.
 
-On macOS, integrated build discovery supports:
+Integrated packaging must be requested explicitly:
 
-```text
--DndiSdk
-NDI_SDK_DIR
-/Library/NDI SDK for Apple
-checkout-local NDI SDK for Apple
+```bash
+./gradlew -PenableIntegratedNdi=true :devolay-java:integratedJar
 ```
 
-The current universal NDI macOS library can be packaged for both:
+A complete NDI SDK is resolved in this order:
 
 ```text
-macos/x86-64
-macos/aarch64
+-DndiSdk=<SDK path>
+NDI_SDK_DIR=<SDK path>
+recognized platform installation, where available
+checkout-local SDK fallback
 ```
 
-Integrated builds are intended for controlled application development and packaging.
+The maintained 64-bit desktop integrated targets are:
 
-**This fork does not publish integrated NDI runtime binaries to Maven Central.**
+| Platform | Architecture | Status |
+|---|---|---|
+| macOS | x86-64 | validated with NDI SDK 6.3.2 |
+| macOS | aarch64 / Apple Silicon | validated with NDI SDK 6.3.2 |
+| Windows | x86-64 | supported by the integrated build configuration; platform validation pending |
+| Linux | x86-64 | supported by the integrated build configuration; platform validation pending |
+
+Legacy 32-bit native targets remain part of the inherited Devolay build configuration, but this fork does not promote them as maintained integrated NDI targets.
+
+When integrated packaging is requested, both the NDI runtime binary and its accompanying license file are required. If either is missing, the build fails instead of producing an incomplete integrated artifact.
+
+Integrated NDI packaging is disabled in CI by default. A deliberately controlled environment may override that guard with:
+
+```text
+-PallowIntegratedNdiInCi=true
+```
+
+Android follows a separate packaging path and is not covered by this desktop integrated-build policy.
+
+**This fork does not publish integrated NDI runtime binaries to Maven Central or as public GitHub Actions artifacts.**
+
+The public Maven artifact remains runtime-separated.
 
 See the licensing section below.
 
@@ -343,7 +363,7 @@ For macOS:
 ```bash
 export NDI_SDK_DIR="/Library/NDI SDK for Apple"
 
-./gradlew :devolay-java:integratedJar
+./gradlew -PenableIntegratedNdi=true :devolay-java:integratedJar
 ```
 
 The resulting artifact is generated under:
@@ -451,25 +471,31 @@ The NDI SDK documentation permits header files to be included in open-source pro
 
 NDI runtime binaries are **not** licensed under the Devolay Apache License.
 
-They remain subject to the NDI SDK License Agreement and applicable third-party license terms.
+They remain subject to the current NDI SDK License Agreement, NDI distribution requirements, and applicable third-party license terms.
 
-The public Maven Central artifacts produced by this fork do not redistribute those runtime binaries.
+This fork deliberately keeps its public library distribution runtime-separated:
 
-Local integrated builds may contain NDI binaries obtained from a locally installed SDK. Anyone distributing an application containing those binaries is responsible for complying with the current NDI SDK License Agreement, redistribution requirements, trademark requirements, and applicable third-party rights.
+- public Maven artifacts do not contain NDI runtime binaries;
+- integrated NDI packaging is explicit opt-in;
+- integrated packaging requires the accompanying NDI license file;
+- integrated packaging is disabled in CI by default;
+- integrated artifacts are not published to Maven Central or as public GitHub Actions artifacts.
 
-Refer to the current documentation and license materials distributed by NDI before redistributing an integrated application.
+The local integrated build is retained for development, testing, and controlled application-packaging workflows.
+
+Anyone distributing an application that contains NDI runtime binaries is responsible for reviewing and complying with the current NDI SDK License Agreement, software-distribution requirements, identification requirements, trademark requirements, and applicable third-party rights.
+
+NDI licensing and distribution requirements may change independently of Devolay. Review the current official NDI materials before releasing an application containing NDI runtime binaries.
 
 ## NDI trademark requirements
 
 Applications using NDI should follow the current identification and trademark requirements published by Vizrt NDI AB.
 
-The official NDI information and developer resources are available at:
-
-```text
-ndi.video
-```
+Official NDI information, SDK downloads, licensing materials, and developer resources are available at [ndi.video](https://ndi.video/).
 
 NDI® is a registered trademark of Vizrt NDI AB.
+
+Devolay and this community-maintained fork are independent projects and are not affiliated with or endorsed by Vizrt NDI AB.
 
 ## Original project
 
