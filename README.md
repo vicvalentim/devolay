@@ -33,7 +33,7 @@ io.github.vicvalentim
 The current fork release line is:
 
 ```text
-2.1.1-vic.1
+2.2.0-vic.1
 ```
 
 ## Fork goals
@@ -215,7 +215,7 @@ An NDI Runtime must therefore be installed on the target system.
 The maintained fork uses:
 
 ```text
-io.github.vicvalentim:devolay:2.1.1-vic.1
+io.github.vicvalentim:devolay:2.2.0-vic.1
 ```
 
 The first public Maven Central release of the fork is being prepared.
@@ -232,7 +232,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.github.vicvalentim:devolay:2.1.1-vic.1'
+    implementation 'io.github.vicvalentim:devolay:2.2.0-vic.1'
 }
 ```
 
@@ -244,7 +244,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.vicvalentim:devolay:2.1.1-vic.1")
+    implementation("io.github.vicvalentim:devolay:2.2.0-vic.1")
 }
 ```
 
@@ -254,7 +254,7 @@ dependencies {
 <dependency>
     <groupId>io.github.vicvalentim</groupId>
     <artifactId>devolay</artifactId>
-    <version>2.1.1-vic.1</version>
+    <version>2.2.0-vic.1</version>
 </dependency>
 ```
 
@@ -275,7 +275,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.github.vicvalentim:devolay:2.1.1-vic.1'
+    implementation 'io.github.vicvalentim:devolay:2.2.0-vic.1'
 }
 ```
 
