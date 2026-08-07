@@ -6,6 +6,8 @@ The public distribution model is runtime-separated by default.
 
 The normal Maven artifact contains the Devolay Java API and Devolay JNI native libraries. It must not contain proprietary NDI runtime binaries.
 
+The current repository uses the WalkerKnapp Gradle 7.2cc wrapper for native build support. Release and verification commands in this checklist must be run with JDK 11 unless the Gradle/native build infrastructure is explicitly upgraded in a later release. This build-JVM requirement does not change Devolay's Java 8 source compatibility.
+
 ## 1. Verify repository state
 
 Confirm that the release branch is current and the working tree is clean.

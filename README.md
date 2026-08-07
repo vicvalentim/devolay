@@ -171,7 +171,7 @@ The fork modernizes several parts of the original build infrastructure, includin
 - current GitHub Actions versions;
 - Maven Central Publisher API support;
 - bearer-token authentication;
-- platform-specific native build jobs;
+- multi-platform native build jobs;
 - universal desktop native artifact assembly;
 - source and Javadoc publication;
 - Gradle Module Metadata;
@@ -325,7 +325,9 @@ C/C++ toolchain appropriate for the target platform
 
 The project retains Java 8 source compatibility.
 
-The CI build currently uses Java 11, and Apple Silicon validation has also been performed with Java 17.
+The repository currently uses the WalkerKnapp Gradle 7.2cc wrapper for its native build toolchain. Run this wrapper with JDK 11. Java 17 is supported for running and validating Devolay applications, but it is not the supported build JVM for the current Gradle wrapper.
+
+The CI build therefore uses JDK 11. Apple Silicon runtime validation has also been performed with Java 17.
 
 ### Standard build
 
