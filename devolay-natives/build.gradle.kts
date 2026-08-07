@@ -1,3 +1,5 @@
+// This file has been modified from the original WalkerKnapp/devolay version by the vicvalentim/devolay community-maintained fork (2026).
+
 import de.undercouch.gradle.tasks.download.Download
 import org.gradle.internal.jvm.Jvm
 import org.gradle.internal.os.OperatingSystem

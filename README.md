@@ -1,5 +1,7 @@
 # Devolay — Community-Maintained Fork
 
+> **Modification notice:** This file has been modified from the original WalkerKnapp/devolay version by the vicvalentim/devolay community-maintained fork (2026).
+
 Devolay is a Java binding for the NDI® SDK, providing access to NDI video, audio, metadata, discovery, sending, and receiving from Java applications through JNI.
 
 This repository is a community-maintained fork of the original `WalkerKnapp/devolay` project created by Walker Knapp. It preserves the original Java API and package namespace while modernizing the native build, current NDI compatibility, Apple Silicon support, CI, and Maven publication infrastructure.
