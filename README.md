@@ -212,19 +212,25 @@ An NDI Runtime must therefore be installed on the target system.
 
 ## Maven coordinates
 
-The maintained fork uses:
+The maintained fork is available from Maven Central as:
 
 ```text
 io.github.vicvalentim:devolay:2.2.0-vic.1
 ```
 
-The first public Maven Central release of the fork is being prepared.
+Maven Central:
 
-Until the release is visible in Maven Central, use Maven Local as described below.
+```text
+https://repo1.maven.org/maven2/io/github/vicvalentim/devolay/2.2.0-vic.1/
+```
+
+GitHub release:
+
+```text
+https://github.com/vicvalentim/devolay/releases/tag/v2.2.0-vic.1
+```
 
 ### Gradle
-
-After publication to Maven Central:
 
 ```groovy
 repositories {
@@ -257,6 +263,7 @@ dependencies {
     <version>2.2.0-vic.1</version>
 </dependency>
 ```
+
 
 ## Using Maven Local
 
