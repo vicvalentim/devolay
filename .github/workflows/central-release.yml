@@ -8,7 +8,7 @@ on:
         required: true
         type: choice
         options:
-          - UPLOAD 2.1.1-vic.1
+          - UPLOAD 2.2.0-vic.1
 
 permissions:
   contents: read

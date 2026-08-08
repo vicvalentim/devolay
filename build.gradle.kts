@@ -6,5 +6,5 @@ plugins {
 
 allprojects {
     group = "io.github.vicvalentim"
-    version = "2.1.1-vic.1"
+    version = "2.2.0-vic.1"
 }
