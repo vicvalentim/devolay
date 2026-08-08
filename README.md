@@ -116,6 +116,8 @@ NDI Runtime 6.3.2
 
 The same JNI build was also validated against an installed NDI 6.0.1 runtime, demonstrating compatibility across the tested NDI 6.x runtime versions.
 
+The published `2.2.0-vic.1` Maven Central artifact has also been validated as a direct dependency of [ziviDomeLive](https://github.com/vicvalentim/ziviDomeLive) on Apple Silicon. The library was resolved exclusively through `mavenCentral()`, packaged successfully as a Processing library dependency, and executed against NDI Runtime 6.3.2. The ziviDomeLive NDI sender initialized successfully and transmitted its `FISHEYE_DOMEMASTER` output through the dedicated sender worker.
+
 ### Integrated build support
 
 The original Devolay architecture supported an `integrated` artifact containing both Devolay JNI binaries and NDI runtime binaries.
