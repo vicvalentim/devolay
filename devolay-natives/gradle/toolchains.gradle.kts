@@ -79,8 +79,29 @@ open class ToolchainConfiguration : RuleSource() {
         // On macOS, use the locally installed Apple Clang toolchain.
         if (OperatingSystem.current().isMacOsX) {
             register<Clang>("appleClang") {
-                target("macos_x86-64")
-                target("macos_aarch64")
+                target("macos_x86-64") {
+                    this as org.gradle.nativeplatform.toolchain.internal.gcc.DefaultGccPlatformToolChain
+                    val architectureArguments: Action<MutableList<String>> =
+                            org.gradle.api.Action {
+                                add("-arch")
+                                add("x86_64")
+                            }
+                    getcCompiler().withArguments(architectureArguments)
+                    cppCompiler.withArguments(architectureArguments)
+                    linker.withArguments(architectureArguments)
+                }
+
+                target("macos_aarch64") {
+                    this as org.gradle.nativeplatform.toolchain.internal.gcc.DefaultGccPlatformToolChain
+                    val architectureArguments: Action<MutableList<String>> =
+                            org.gradle.api.Action {
+                                add("-arch")
+                                add("arm64")
+                            }
+                    getcCompiler().withArguments(architectureArguments)
+                    cppCompiler.withArguments(architectureArguments)
+                    linker.withArguments(architectureArguments)
+                }
             }
         }
 
