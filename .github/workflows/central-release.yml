@@ -126,8 +126,92 @@ jobs:
           if-no-files-found: error
           retention-days: 1
 
-  native-macos:
-    name: macOS Intel and Apple Silicon natives
+  native-macos-x86-64:
+    name: macOS Intel native
+    runs-on: macos-15-intel
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: gradle
+
+      - name: Verify Intel runner
+        run: |
+          set -euo pipefail
+
+          echo "uname -m: $(uname -m)"
+          test "$(uname -m)" = "x86_64"
+
+      - name: Build macOS Intel native
+        run: |
+          set -euo pipefail
+
+          chmod +x gradlew
+
+          ./gradlew \
+            --no-daemon \
+            :devolay-natives:stripSymbolsReleaseMacosX86-64 \
+            --rerun-tasks
+
+      - name: Validate macOS Intel binary
+        run: |
+          set -euo pipefail
+
+          dylib="devolay-natives/build/lib/main/release/macos/x86-64/stripped/libdevolay-natives.dylib"
+
+          test -f "$dylib"
+
+          file "$dylib"
+
+          archs="$(lipo -archs "$dylib")"
+          echo "Architectures: $archs"
+
+          if [ "$archs" != "x86_64" ]; then
+            echo "ERROR: macOS Intel binary must be x86_64, got: $archs" >&2
+            exit 1
+          fi
+
+          shasum -a 256 "$dylib"
+
+      - name: Prepare macOS Intel artifact
+        run: |
+          set -euo pipefail
+
+          dylib="devolay-natives/build/lib/main/release/macos/x86-64/stripped/libdevolay-natives.dylib"
+          tree="build/ci-artifacts/macos-x86-64"
+
+          rm -rf "$tree"
+          mkdir -p "$tree/natives/macos/x86-64"
+
+          cp \
+            "$dylib" \
+            "$tree/natives/macos/x86-64/libdevolay-natives.dylib"
+
+          jar \
+            --create \
+            --file build/ci-artifacts/devolay-native-macos-x86-64.jar \
+            -C "$tree" .
+
+          jar tf build/ci-artifacts/devolay-native-macos-x86-64.jar
+
+      - name: Upload macOS Intel native
+        uses: actions/upload-artifact@v7
+        with:
+          name: native-macos-x86-64
+          path: build/ci-artifacts/devolay-native-macos-x86-64.jar
+          if-no-files-found: error
+          retention-days: 1
+
+  native-macos-aarch64:
+    name: macOS Apple Silicon native
     runs-on: macos-15
 
     steps:
@@ -143,7 +227,14 @@ jobs:
           java-version: ${{ env.JAVA_VERSION }}
           cache: gradle
 
-      - name: Build macOS natives
+      - name: Verify Apple Silicon runner
+        run: |
+          set -euo pipefail
+
+          echo "uname -m: $(uname -m)"
+          test "$(uname -m)" = "arm64"
+
+      - name: Build macOS Apple Silicon native
         run: |
           set -euo pipefail
 
@@ -151,54 +242,55 @@ jobs:
 
           ./gradlew \
             --no-daemon \
-            :devolay-natives:assembleNativeArtifacts \
+            :devolay-natives:stripSymbolsReleaseMacosAarch64 \
             --rerun-tasks
 
-      - name: Validate macOS natives
+      - name: Validate macOS Apple Silicon binary
         run: |
           set -euo pipefail
 
-          test -f "$NATIVE_JAR"
+          dylib="devolay-natives/build/lib/main/release/macos/aarch64/stripped/libdevolay-natives.dylib"
 
-          entries="$(jar tf "$NATIVE_JAR")"
-          printf '%s\n' "$entries"
+          test -f "$dylib"
 
-          expected_directories=(
-            "natives/macos/x86-64"
-            "natives/macos/aarch64"
-          )
+          file "$dylib"
 
-          for directory in "${expected_directories[@]}"; do
-            if ! grep -Eq \
-              "^${directory}/[^/]+\.dylib$" \
-              <<<"$entries"; then
-              echo "Missing native binary in ${directory}" >&2
-              exit 1
-            fi
-          done
+          archs="$(lipo -archs "$dylib")"
+          echo "Architectures: $archs"
 
-          if grep -Eiq \
-            'libndi|integrated|\.dwarf$|\.debug$' \
-            <<<"$entries"; then
-            echo "Forbidden file found in native artifact." >&2
+          if [ "$archs" != "arm64" ]; then
+            echo "ERROR: macOS Apple Silicon binary must be arm64, got: $archs" >&2
             exit 1
           fi
 
-      - name: Prepare macOS artifact
+          shasum -a 256 "$dylib"
+
+      - name: Prepare macOS Apple Silicon artifact
         run: |
           set -euo pipefail
 
-          mkdir -p build/ci-artifacts
+          dylib="devolay-natives/build/lib/main/release/macos/aarch64/stripped/libdevolay-natives.dylib"
+          tree="build/ci-artifacts/macos-aarch64"
+
+          rm -rf "$tree"
+          mkdir -p "$tree/natives/macos/aarch64"
 
           cp \
-            "$NATIVE_JAR" \
-            build/ci-artifacts/devolay-native-macos.jar
+            "$dylib" \
+            "$tree/natives/macos/aarch64/libdevolay-natives.dylib"
 
-      - name: Upload macOS natives
+          jar \
+            --create \
+            --file build/ci-artifacts/devolay-native-macos-aarch64.jar \
+            -C "$tree" .
+
+          jar tf build/ci-artifacts/devolay-native-macos-aarch64.jar
+
+      - name: Upload macOS Apple Silicon native
         uses: actions/upload-artifact@v7
         with:
-          name: native-macos
-          path: build/ci-artifacts/devolay-native-macos.jar
+          name: native-macos-aarch64
+          path: build/ci-artifacts/devolay-native-macos-aarch64.jar
           if-no-files-found: error
           retention-days: 1
 
@@ -206,7 +298,8 @@ jobs:
     name: Assemble and upload Maven Central release
     needs:
       - native-linux-windows
-      - native-macos
+      - native-macos-x86-64
+      - native-macos-aarch64
     runs-on: ubuntu-22.04
     environment: maven-central
 
@@ -229,29 +322,38 @@ jobs:
           name: native-linux-windows
           path: build/native-input/linux-windows
 
-      - name: Download macOS natives
+      - name: Download macOS Intel native
         uses: actions/download-artifact@v8
         with:
-          name: native-macos
-          path: build/native-input/macos
+          name: native-macos-x86-64
+          path: build/native-input/macos-x86-64
+
+      - name: Download macOS Apple Silicon native
+        uses: actions/download-artifact@v8
+        with:
+          name: native-macos-aarch64
+          path: build/native-input/macos-aarch64
 
       - name: Assemble universal native JAR
         run: |
           set -euo pipefail
 
           linux_windows_jar="build/native-input/linux-windows/devolay-native-linux-windows.jar"
-          macos_jar="build/native-input/macos/devolay-native-macos.jar"
+          macos_x86_jar="build/native-input/macos-x86-64/devolay-native-macos-x86-64.jar"
+          macos_arm_jar="build/native-input/macos-aarch64/devolay-native-macos-aarch64.jar"
           native_tree="build/universal-native-tree"
           universal_jar="build/universal-native-artifacts.jar"
 
           test -f "$linux_windows_jar"
-          test -f "$macos_jar"
+          test -f "$macos_x86_jar"
+          test -f "$macos_arm_jar"
 
           rm -rf "$native_tree"
           mkdir -p "$native_tree"
 
           unzip -q -o "$linux_windows_jar" -d "$native_tree"
-          unzip -q -o "$macos_jar" -d "$native_tree"
+          unzip -q -o "$macos_x86_jar" -d "$native_tree"
+          unzip -q -o "$macos_arm_jar" -d "$native_tree"
 
           rm -rf "$native_tree/META-INF"
 
@@ -287,6 +389,36 @@ jobs:
             echo "Forbidden file found in universal artifact." >&2
             exit 1
           fi
+
+          x86_dylib="$native_tree/natives/macos/x86-64/libdevolay-natives.dylib"
+          arm_dylib="$native_tree/natives/macos/aarch64/libdevolay-natives.dylib"
+
+          test -f "$x86_dylib"
+          test -f "$arm_dylib"
+
+          echo "macOS Intel binary in universal artifact:"
+          x86_description="$(file "$x86_dylib")"
+          echo "$x86_description"
+
+          if ! grep -q 'Mach-O' <<<"$x86_description" ||
+             ! grep -q 'x86_64' <<<"$x86_description" ||
+             grep -q 'arm64' <<<"$x86_description"; then
+            echo "Invalid macOS Intel binary in universal artifact." >&2
+            exit 1
+          fi
+
+          echo "macOS Apple Silicon binary in universal artifact:"
+          arm_description="$(file "$arm_dylib")"
+          echo "$arm_description"
+
+          if ! grep -q 'Mach-O' <<<"$arm_description" ||
+             ! grep -q 'arm64' <<<"$arm_description" ||
+             grep -q 'x86_64' <<<"$arm_description"; then
+            echo "Invalid macOS Apple Silicon binary in universal artifact." >&2
+            exit 1
+          fi
+
+          sha256sum "$x86_dylib" "$arm_dylib"
 
       - name: Generate Maven staging repository
         run: |
@@ -380,6 +512,51 @@ jobs:
             echo "Forbidden file found in Maven JAR." >&2
             exit 1
           fi
+
+          arch_check_dir="$(mktemp -d)"
+
+          mkdir -p \
+            "$arch_check_dir/x86-64" \
+            "$arch_check_dir/aarch64"
+
+          unzip -p \
+            "$main_jar" \
+            natives/macos/x86-64/libdevolay-natives.dylib \
+            > "$arch_check_dir/x86-64/libdevolay-natives.dylib"
+
+          unzip -p \
+            "$main_jar" \
+            natives/macos/aarch64/libdevolay-natives.dylib \
+            > "$arch_check_dir/aarch64/libdevolay-natives.dylib"
+
+          x86_dylib="$arch_check_dir/x86-64/libdevolay-natives.dylib"
+          arm_dylib="$arch_check_dir/aarch64/libdevolay-natives.dylib"
+
+          x86_description="$(file "$x86_dylib")"
+          arm_description="$(file "$arm_dylib")"
+
+          echo "Maven JAR macOS Intel binary:"
+          echo "$x86_description"
+
+          if ! grep -q 'Mach-O' <<<"$x86_description" ||
+             ! grep -q 'x86_64' <<<"$x86_description" ||
+             grep -q 'arm64' <<<"$x86_description"; then
+            echo "Invalid macOS Intel binary in Maven JAR." >&2
+            exit 1
+          fi
+
+          echo "Maven JAR macOS Apple Silicon binary:"
+          echo "$arm_description"
+
+          if ! grep -q 'Mach-O' <<<"$arm_description" ||
+             ! grep -q 'arm64' <<<"$arm_description" ||
+             grep -q 'x86_64' <<<"$arm_description"; then
+            echo "Invalid macOS Apple Silicon binary in Maven JAR." >&2
+            exit 1
+          fi
+
+          sha256sum "$x86_dylib" "$arm_dylib"
+          rm -rf "$arch_check_dir"
 
           if grep -Eiq \
             'integrated|ndi-lib|integratedApiElements|integratedRuntimeElements' \
