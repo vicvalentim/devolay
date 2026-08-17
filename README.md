@@ -30,10 +30,16 @@ The Maven group used by this maintained fork is:
 io.github.vicvalentim
 ```
 
-The current fork release line is:
+The latest published fork release is:
 
 ```text
 2.2.0-vic.1
+```
+
+The current release branch is preparing:
+
+```text
+2.2.0-vic.2
 ```
 
 ## Fork goals
@@ -284,7 +290,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.github.vicvalentim:devolay:2.2.0-vic.1'
+    implementation 'io.github.vicvalentim:devolay:2.2.0-vic.2'
 }
 ```
 

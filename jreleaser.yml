@@ -1,6 +1,6 @@
 project:
   name: devolay
-  version: 2.2.0-vic.1
+  version: 2.2.0-vic.2
   versionPattern: SEMVER
   description: Community-maintained fork of Devolay with macOS Apple Silicon support.
   authors:
