@@ -1,0 +1,124 @@
+name: Maven Central publish validated deployment
+
+on:
+  workflow_dispatch:
+    inputs:
+      deployment_id:
+        description: Maven Central deployment ID in VALIDATED state
+        required: true
+        type: string
+      version:
+        description: Release version contained in the validated deployment
+        required: true
+        type: string
+      confirmation:
+        description: Type PUBLISH followed by the release version
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: central-publish
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  JAVA_VERSION: "11"
+
+jobs:
+  publish:
+    name: Publish validated Maven Central deployment
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Verify publication authorization
+        env:
+          DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+          RELEASE_VERSION: ${{ inputs.version }}
+          CONFIRMATION: ${{ inputs.confirmation }}
+        run: |
+          set -euo pipefail
+
+          expected="PUBLISH ${RELEASE_VERSION}"
+
+          if [ "$CONFIRMATION" != "$expected" ]; then
+            echo "ERROR: confirmation must be exactly: $expected"
+            exit 1
+          fi
+
+          if ! [[ "$DEPLOYMENT_ID" =~ ^[0-9a-fA-F-]{36}$ ]]; then
+            echo "ERROR: deployment_id does not have UUID form."
+            exit 1
+          fi
+
+          configured_version="$(
+            awk '
+              /^project:/ { in_project=1; next }
+              in_project && /^[[:space:]]+version:/ {
+                gsub(/^[[:space:]]+version:[[:space:]]*/, "")
+                gsub(/["'\'']/, "")
+                print
+                exit
+              }
+            ' jreleaser.yml
+          )"
+
+          if [ -z "$configured_version" ]; then
+            echo "ERROR: could not determine project.version from jreleaser.yml."
+            exit 1
+          fi
+
+          if [ "$RELEASE_VERSION" != "$configured_version" ]; then
+            echo "ERROR: requested version $RELEASE_VERSION does not match jreleaser.yml version $configured_version."
+            exit 1
+          fi
+
+          echo "Publication authorization validated."
+          echo "Version: $RELEASE_VERSION"
+          echo "Deployment: $DEPLOYMENT_ID"
+
+      - name: Publish validated deployment
+        uses: jreleaser/release-action@v2
+        with:
+          version: "1.25.0"
+          setup-java: false
+          arguments: >-
+            deploy
+            --basedir .
+            --config-file jreleaser.yml
+            --yolo
+        env:
+          JRELEASER_DEPLOY_MAVEN_MAVENCENTRAL_CENTRAL_TOKEN: ${{ secrets.JRELEASER_MAVENCENTRAL_TOKEN }}
+          JRELEASER_DEPLOY_MAVEN_MAVENCENTRAL_CENTRAL_STAGE: PUBLISH
+          JRELEASER_DEPLOY_MAVEN_MAVENCENTRAL_CENTRAL_DEPLOYMENT_ID: ${{ inputs.deployment_id }}
+
+      - name: Record publication result
+        if: ${{ always() }}
+        run: |
+          properties="out/jreleaser/output.properties"
+
+          {
+            echo "### Maven Central publication"
+            echo ""
+            echo "Version: \`${{ inputs.version }}\`"
+            echo "Deployment: \`${{ inputs.deployment_id }}\`"
+
+            if [ -f "$properties" ]; then
+              echo ""
+              grep -iE "deployment.?id|namespace" "$properties" || true
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

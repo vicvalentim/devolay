@@ -158,23 +158,49 @@ The staging pipeline must verify:
 
 Any validation failure is a release blocker.
 
-## 12. Signing
+## 12. Maven Central upload and publication
+
+`.github/workflows/central-staging.yml` is the non-publishing qualification workflow.
+
+`.github/workflows/central-release.yml` performs the authenticated Maven Central upload using JReleaser with `stage: UPLOAD`.
+
+With JReleaser 1.25.0, the `UPLOAD` stage uploads the bundle and waits for the Central deployment to reach `VALIDATED` or `FAILED`. It does not invoke the Maven Central publication endpoint.
+
+The JReleaser 1.25.0 Maven Central client uploads the bundle without specifying `publishingType`. Under the Central Publisher API contract, the omitted value defaults to `USER_MANAGED`. A successfully validated deployment therefore remains in `VALIDATED` until a separate publication action is explicitly performed.
+
+Treat the process as two distinct authorization boundaries:
+
+1. **Upload authorization** — run `.github/workflows/central-release.yml`, producing a validated Central deployment and recording its `deploymentId`.
+2. **Publication authorization** — explicitly publish that validated deployment, either through the Central Portal or through a controlled JReleaser `PUBLISH` operation using the recorded `deploymentId`.
+
+Before publication, inspect the validated deployment and confirm that all release, binary architecture, signing, packaging, licensing, and physical runtime qualification gates have passed.
+
+Once publication is explicitly authorized, the transition from `VALIDATED` to `PUBLISHING` and then `PUBLISHED` is irreversible for that released Maven version.
+
+After Maven Central reports the deployment as `PUBLISHED`:
+
+1. verify the public Maven coordinates;
+2. create the Git tag at the exact qualified release commit;
+3. create the corresponding GitHub Release;
+4. update current-version documentation in a subsequent post-release commit.
+
+## 13. Signing
 
 Confirm that the release signing key is valid, unexpired, correctly configured in GitHub Actions, and discoverable by the required validation infrastructure.
 
 Never commit signing keys, private-key material, passwords, passphrases, or credentials to the repository.
 
-## 13. Maven Central credentials
+## 14. Maven Central credentials
 
 Maven Central publication credentials must remain in GitHub Actions secrets or protected environment secrets.
 
 Central User Tokens, bearer tokens, usernames, passwords, and signing credentials must never be stored in repository files.
 
-Keep public Central upload workflows disabled while preparing or auditing a release.
+Keep Maven Central upload and publication actions uninvoked while preparing or auditing a release.
 
-## 14. Final release gate
+## 15. Final release gate
 
-Before enabling a public Maven Central upload, confirm all of the following:
+Before authorizing a public Maven Central publication, confirm all of the following:
 
 - repository build passes;
 - working tree and release commit are known;
@@ -195,4 +221,4 @@ Before enabling a public Maven Central upload, confirm all of the following:
 - signing is valid;
 - Maven Central credentials are current.
 
-Only after all release gates pass should the Maven Central release workflow be enabled.
+Only after all release gates pass should the Maven Central upload be authorized. Publication requires a separate explicit authorization.

@@ -33,12 +33,6 @@ io.github.vicvalentim
 The latest published fork release is:
 
 ```text
-2.2.0-vic.1
-```
-
-The current release branch is preparing:
-
-```text
 2.2.0-vic.2
 ```
 
@@ -123,6 +117,8 @@ NDI Runtime 6.3.2
 The same JNI build was also validated against an installed NDI 6.0.1 runtime, demonstrating compatibility across the tested NDI 6.x runtime versions.
 
 The published `2.2.0-vic.1` Maven Central artifact has also been validated as a direct dependency of [ziviDomeLive](https://github.com/vicvalentim/ziviDomeLive) on Apple Silicon. The library was resolved exclusively through `mavenCentral()`, packaged successfully as a Processing library dependency, and executed against NDI Runtime 6.3.2. The ziviDomeLive NDI sender initialized successfully and transmitted its `FISHEYE_DOMEMASTER` output through the dedicated sender worker.
+
+The `2.2.0-vic.2` release was qualified before publication on physical macOS Intel `x86_64` and Apple Silicon `arm64` hardware. The Intel system was validated with NDI Runtime 6.3.2 and the Apple Silicon system with NDI Runtime 6.0.1. Processing and ziviDomeLive initialized Devolay successfully on both architectures, live NDI video transmission was confirmed, and NDI communication was verified over the physical network between the two systems.
 
 ### Integrated build support
 
@@ -223,19 +219,19 @@ An NDI Runtime must therefore be installed on the target system.
 The maintained fork is available from Maven Central as:
 
 ```text
-io.github.vicvalentim:devolay:2.2.0-vic.1
+io.github.vicvalentim:devolay:2.2.0-vic.2
 ```
 
 Maven Central:
 
 ```text
-https://repo1.maven.org/maven2/io/github/vicvalentim/devolay/2.2.0-vic.1/
+https://repo1.maven.org/maven2/io/github/vicvalentim/devolay/2.2.0-vic.2/
 ```
 
 GitHub release:
 
 ```text
-https://github.com/vicvalentim/devolay/releases/tag/v2.2.0-vic.1
+https://github.com/vicvalentim/devolay/releases/tag/v2.2.0-vic.2
 ```
 
 ### Gradle
@@ -246,7 +242,7 @@ repositories {
 }
 
 dependencies {
-    implementation 'io.github.vicvalentim:devolay:2.2.0-vic.1'
+    implementation 'io.github.vicvalentim:devolay:2.2.0-vic.2'
 }
 ```
 
@@ -258,7 +254,7 @@ repositories {
 }
 
 dependencies {
-    implementation("io.github.vicvalentim:devolay:2.2.0-vic.1")
+    implementation("io.github.vicvalentim:devolay:2.2.0-vic.2")
 }
 ```
 
@@ -268,7 +264,7 @@ dependencies {
 <dependency>
     <groupId>io.github.vicvalentim</groupId>
     <artifactId>devolay</artifactId>
-    <version>2.2.0-vic.1</version>
+    <version>2.2.0-vic.2</version>
 </dependency>
 ```
 
